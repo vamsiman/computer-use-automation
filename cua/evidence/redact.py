@@ -77,6 +77,15 @@ class Redactor:
     #: contains another is replaced whole.
     literals: tuple[tuple[str, str], ...] = ()
     salt: str = ""
+    #: Treat a value the run has *read* as sensitive even though nothing
+    #: declared it. For discovery, where there is no contract yet to read a
+    #: classification from -- discovery is the thing that produces one.
+    #:
+    #: Affects only the literal scrub, never the name-keyed classification. A
+    #: blanket default of "every field is PII" would tokenise `kind` and
+    #: `step_id` too and leave a log nobody can read, which is not a safety
+    #: improvement, it is a deleted log.
+    assume_sensitive: bool = False
 
     def __post_init__(self) -> None:
         if not self.salt:
@@ -95,6 +104,20 @@ class Redactor:
         }
         values = env_secrets() if secrets is None else secrets
         return cls(rules=rules).with_secrets(values)
+
+    @classmethod
+    def for_discovery(cls) -> "Redactor":
+        """For a run with no artifact, because it is making one.
+
+        Discovery is a high-exposure operation by its nature: it reads whole
+        screens of a live system and the model discusses what it found in
+        prose. This covers what the run *extracts*, from the moment it is
+        extracted. It cannot cover a value quoted in the model's own summary
+        of a page it read earlier, and pretending otherwise would be worse
+        than saying so -- which is why discovery evidence is governed by
+        retention as much as by masking.
+        """
+        return cls(rules={}, assume_sensitive=True).with_secrets(env_secrets())
 
     @classmethod
     def empty(cls) -> "Redactor":
@@ -121,7 +144,9 @@ class Redactor:
             level = self.classify(name)
             if level is Sensitivity.SECRET:
                 additions.append((str(value), SECRET_MASK))
-            elif level is Sensitivity.PII:
+            elif level is Sensitivity.PII or (
+                self.assume_sensitive and level is Sensitivity.INTERNAL
+            ):
                 additions.append((str(value), self.token(name, value)))
         return self._add_literals(additions)
 

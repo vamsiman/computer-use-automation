@@ -196,6 +196,10 @@ class ReplayEngine:
         if contract is not None:
             return self._finish(contract, began)
 
+        entry = self._check_entry()
+        if entry is not None:
+            return self._finish(entry, began)
+
         index = 0
         budget = len(self.artifact.steps) * ACTION_MULTIPLIER + ACTION_FLOOR
 
@@ -451,6 +455,39 @@ class ReplayEngine:
         if self._verify(step.checkpoint):
             return _StepOutcome()
         return _StepOutcome(advance=False)
+
+    # --- preconditions ---------------------------------------------------
+
+    def _check_entry(self) -> Result | None:
+        """Are we looking at the screen this capability starts from?
+
+        Cheap, and it turns the most confusing failure mode there is into a
+        sentence. Started from the wrong screen, the first locator does not
+        resolve and the run reports that the Member ID field is missing --
+        which sends somebody looking for a broken locator when the locator is
+        fine and the browser is simply somewhere else.
+
+        Only checked when the artifact declares it. An artifact that begins
+        with a navigate does not need one, because its first step puts the
+        browser where it belongs.
+        """
+        checkpoint = self.artifact.preconditions.entry_checkpoint
+        if checkpoint is None or self._verify(checkpoint):
+            return None
+
+        expected = checkpoint.target.describe()
+        return Failure(
+            capability=self.artifact.ref,
+            category=FailureCategory.PRECONDITION,
+            step_id=None,
+            intent="start from the screen this capability expects",
+            expected=expected,
+            observed=self._describe(self.surface.observe()),
+            detail=(
+                "the capability did not run. Put the session on the expected "
+                "screen first, or add a navigate step to the artifact."
+            ),
+        )
 
     # --- checkpoints -----------------------------------------------------
 

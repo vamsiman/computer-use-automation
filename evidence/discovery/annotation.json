@@ -1,0 +1,20 @@
+{
+  "id": "member.read_savings_balance",
+  "title": "Look up member and read savings balance",
+  "description": "Looks up a member by their member ID and retrieves the current balance of their savings account. Requires a member ID as input (e.g. \"10001\"); returns the member's savings account balance (e.g. \"4,210.33\") along with contextual details such as member name, status, and branch visible on the search result. This is a read-only operation and does not modify any data.",
+  "step_intents": [
+    {
+      "id": "s1",
+      "intent": "Enter the member number into the search field"
+    },
+    {
+      "id": "s2",
+      "intent": "Submit the member search for the given member ID"
+    },
+    {
+      "id": "s3",
+      "intent": "Extract the savings account balance for the looked-up member"
+    }
+  ],
+  "outcomes": []
+}

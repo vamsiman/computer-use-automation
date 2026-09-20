@@ -383,9 +383,15 @@ class DiscoveryAgent:
             evidence.error = result.error
             evidence.policy_rule = record.policy_rule
             if result.value is not None and action.type is ActionType.EXTRACT:
-                evidence.extracted = {
-                    str(action.args.get("into") or "value"): result.value
-                }
+                name = str(action.args.get("into") or "value")
+                evidence.extracted = {name: result.value}
+                if self.recorder:
+                    # Before the record is written, not after. There is no
+                    # contract yet to classify this value -- discovery is what
+                    # produces one -- so the run protects what it reads from
+                    # the moment it reads it, including the record it is
+                    # standing inside.
+                    self.recorder.learn({name: result.value})
             if self.recorder:
                 record.screenshot_ref = self.recorder.screenshot(self.surface)
                 evidence.screenshot = record.screenshot_ref

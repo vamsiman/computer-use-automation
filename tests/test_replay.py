@@ -705,3 +705,77 @@ def test_a_step_without_a_checkpoint_has_only_the_drivers_word(
 
     assert isinstance(result, Failure)
     assert result.step_id == "s2"
+
+
+# --- starting from the wrong place ---------------------------------------
+#
+# Found by replaying the first genuinely discovered artifact. Discovery began
+# on the search screen and never navigated there, so the capability silently
+# assumed it -- and replayed from the member detail page it failed at step one
+# reporting that the Member ID field was missing. The locator was fine. The
+# browser was somewhere else.
+
+
+def entry_at(artifact, heading: str):
+    from cua.artifact.models import Checkpoint
+    from cua.locators import Locator
+
+    artifact.preconditions.entry_checkpoint = Checkpoint(
+        target=Locator(primary=RoleNameSpec(role="heading", name=heading)),
+        expect="visible",
+        timeout_ms=FAST_MS,
+    )
+    return artifact
+
+
+def test_a_capability_started_from_the_wrong_screen_says_so(artifact, engine_policy):
+    """The most confusing failure mode there is, turned into a sentence.
+
+    Without this the report is "the Member ID field did not resolve", which
+    sends somebody hunting for a broken locator that is not broken.
+    """
+    surface = FakeSurface([screen("Member Details")])
+    result = ReplayEngine(
+        surface, entry_at(artifact, "Member Search"), policy=engine_policy
+    ).run({"member_id": "10001"})
+
+    assert isinstance(result, Failure)
+    assert result.category is FailureCategory.PRECONDITION
+    assert result.steps_executed == 0
+    assert surface.acted == [], "nothing should have been done to the application"
+    assert "Member Search" in result.expected
+    assert "Member Details" in result.observed
+
+
+def test_the_right_screen_is_not_remarked_upon(artifact, engine_policy):
+    surface = FakeSurface(
+        [
+            screen("Member Search"),
+            screen("Member Search"),
+            screen("Member Details"),
+        ],
+        values={"member_name": "Dana", "savings_balance": "4,210.33"},
+    )
+    result = ReplayEngine(
+        surface, entry_at(artifact, "Member Search"), policy=engine_policy
+    ).run({"member_id": "10001"})
+
+    assert isinstance(result, Success), getattr(result, "observed", result)
+
+
+def test_a_capability_that_declares_no_entry_screen_is_not_second_guessed(
+    artifact, engine_policy
+):
+    """An artifact whose first step is a navigate puts the browser where it
+    belongs, and does not need telling where it already is."""
+    assert artifact.preconditions.entry_checkpoint is None
+    surface = FakeSurface(
+        [
+            screen("Anywhere At All"),
+            screen("Member Search"),
+            screen("Member Details"),
+        ],
+        values={"member_name": "Dana", "savings_balance": "4,210.33"},
+    )
+    result = run(artifact, surface, engine_policy)
+    assert isinstance(result, Success), getattr(result, "observed", result)

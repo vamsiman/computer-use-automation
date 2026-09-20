@@ -9,5 +9,5 @@ venv/
 .env
 
 # local run scratch (evidence/ itself IS a deliverable and is committed)
-runs/
+/runs/
 *.db

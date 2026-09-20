@@ -230,13 +230,76 @@ def _path_between(
     return "/".join(reversed(steps)) if steps else None
 
 
-def synthesize(tree: A11yNode, node: A11yNode) -> Locator | None:
+def reads_as(node: A11yNode) -> str:
+    """What an extract would return from this node.
+
+    Value before name, matching the surface: for a text field the value is
+    what was typed, and for a table cell there is no value and the name is the
+    content.
+    """
+    return (node.value or node.name or "").strip()
+
+
+def _table_of(node: A11yNode, parents: dict[int, A11yNode]) -> A11yNode | None:
+    return next(
+        (a for a in ancestors(node, parents) if a.role == "table"), None
+    )
+
+
+def _defined_by_the_data(
+    spec: LocatorSpec, node: A11yNode, parents: dict[int, A11yNode]
+) -> bool:
+    """Would this spec describe the value by the value?
+
+    Two shapes, and both verify perfectly at record time, which is why
+    verification cannot catch them:
+
+    * ``cell "4,210.33"`` -- the locator names the number it is there to read.
+      It works on exactly one member and on no other, and a chain whose
+      primary is this reports every subsequent run as degraded.
+    * ``the cell below "1,287.50"`` -- anchored on a neighbouring cell of the
+      same table, which is not a label but another datum. It moves with the
+      data it was supposed to be independent of.
+
+    ``_row_cell_spec`` already refuses to identify a row by the cell it is
+    reading, for exactly this reason. This makes that a property of the whole
+    chain rather than of one rule.
+    """
+    value = reads_as(node)
+    if not value:
+        return False
+
+    if isinstance(spec, RoleNameSpec):
+        return (spec.name or "").strip() == value
+
+    if isinstance(spec, LabelProximitySpec):
+        table = _table_of(node, parents)
+        if table is None:
+            return False
+        return any(
+            n is not node and n.role == "cell" and _text(n) == spec.label
+            for n in walk(table)
+        )
+
+    return False
+
+
+def synthesize(
+    tree: A11yNode, node: A11yNode, *, reading: bool = False
+) -> Locator | None:
     """Build a verified, tiered locator for one node.
 
     Returns ``None`` when nothing in the vocabulary can identify this node
     unambiguously -- which is a real answer, and better than a locator that
     resolves to something else on a later run. The caller reports the control
     as untargetable and the model picks something else.
+
+    ``reading`` says this locator is for a value we are about to extract, and
+    it changes what counts as a valid description: **a locator may not be
+    defined in terms of the data it is meant to read.** Discarded rather than
+    demoted, because a circular spec sitting at the end of a chain is worse
+    than absent -- on a later run it either fails, or quietly resolves to some
+    *other* row that happens to hold the number we remembered.
     """
     parents = parent_map(tree)
     candidates: list[LocatorSpec | None] = [
@@ -246,6 +309,8 @@ def synthesize(tree: A11yNode, node: A11yNode) -> Locator | None:
         _row_cell_spec(tree, node, parents),
     ]
     specs = [spec for spec in candidates if spec is not None]
+    if reading:
+        specs = [s for s in specs if not _defined_by_the_data(s, node, parents)]
     if not specs:
         return None
 

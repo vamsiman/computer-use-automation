@@ -1,0 +1,136 @@
+schema_version: '1.0'
+capability:
+  id: member.read_savings_balance
+  version: 1.0.0
+  title: Look up member and read savings balance
+  description: Looks up a member by their member ID and retrieves the current balance of their
+    savings account. Requires a member ID as input (e.g. "10001"); returns the member's savings
+    account balance (e.g. "4,210.33") along with contextual details such as member name, status,
+    and branch visible on the search result. This is a read-only operation and does not modify
+    any data.
+  app:
+    vendor: meridian
+    product: MemberConsole
+    version_range: '*'
+  status: draft
+  provenance:
+    discovered_at: '2026-09-20T22:49:45.558995Z'
+    model: claude-sonnet-5
+    run_id: 20260920T224944Z-run-e6b666
+    step_count_raw: 4
+    step_count_final: 3
+inputs:
+  member_id:
+    type: string
+    description: Supplied as '10001' during discovery.
+    required: true
+    pattern: ^[0-9]{5}$
+    sensitivity: internal
+outputs:
+  savings_balance:
+    type: money
+    description: Read from the screen during discovery (Extract the savings account balance
+      for member 10001).
+    sensitivity: pii
+    currency: USD
+preconditions:
+  authenticated: true
+  entry_checkpoint:
+    target:
+      primary:
+        strategy: role_name
+        role: heading
+        name: Member Search
+        nth: 0
+      fallbacks: []
+      confidence: 1.0
+    expect: visible
+    timeout_ms: 8000
+steps:
+- id: s1
+  intent: Enter the member number into the search field
+  action: type
+  target:
+    primary:
+      strategy: label_proximity
+      label: 'Member ID:'
+      direction: right
+      role: textbox
+    fallbacks:
+    - strategy: region_path
+      region: table[5]
+      path: row[0]/cell[2]/textbox[0]
+    confidence: 0.85
+    note: 'No usable accessible name on this textbox, so the primary is label_proximity. Verified
+      fallbacks: region_path.'
+  args:
+    value: '{{ inputs.member_id }}'
+  risk: caution
+- id: s2
+  intent: Submit the member search for the given member ID
+  action: click
+  target:
+    primary:
+      strategy: role_name
+      role: button
+      name: Search
+      nth: 0
+    fallbacks:
+    - strategy: label_proximity
+      label: Member Search
+      direction: right
+      role: button
+    - strategy: region_path
+      region: table[5]
+      path: row[0]/cell[4]/button[0]
+    confidence: 1.0
+    note: 'Resolves on role and accessible name. Verified fallbacks: label_proximity, region_path.'
+  args: {}
+  risk: caution
+  checkpoint:
+    target:
+      primary:
+        strategy: role_name
+        role: heading
+        name: Member Details
+        nth: 0
+      fallbacks: []
+      confidence: 1.0
+    expect: visible
+    timeout_ms: 8000
+- id: s3
+  intent: Extract the savings account balance for the looked-up member
+  action: extract
+  target:
+    primary:
+      strategy: row_cell
+      table: ''
+      row_match: Savings
+      column: Balance
+    fallbacks:
+    - strategy: region_path
+      region: table[6]
+      path: row[2]/cell[2]
+    confidence: 0.8
+    note: 'No usable accessible name on this cell, so the primary is row_cell. Verified fallbacks:
+      region_path.'
+  args:
+    into: savings_balance
+    transform: money
+  risk: safe
+success:
+  checkpoint:
+    target:
+      primary:
+        strategy: role_name
+        role: heading
+        name: Member Details
+        nth: 0
+      fallbacks: []
+      confidence: 1.0
+    expect: visible
+    timeout_ms: 8000
+  require_outputs:
+  - savings_balance
+outcomes: []
+recoveries: []

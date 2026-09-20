@@ -296,7 +296,18 @@ class Preconditions(_Model):
     """
 
     authenticated: bool = True
+    #: A path to start from, when the application has one worth naming.
     entry_point: str | None = None
+    #: The screen the capability expects to be looking at, asserted before the
+    #: first step.
+    #:
+    #: A path cannot carry this on its own. In a frameset application the
+    #: address bar reads the same on every screen, so the URL says nothing
+    #: about where the run actually is -- and a capability whose entry
+    #: condition is a URL would be checking something the application does not
+    #: bother to change. The screen is named the way everything else here
+    #: names screens: by what is on it.
+    entry_checkpoint: Checkpoint | None = None
 
 
 # --- the document ---------------------------------------------------------

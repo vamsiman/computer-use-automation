@@ -89,11 +89,19 @@ class LocatorStrategy(StrEnum):
 
 
 #: Resolution order. Index position doubles as the tier number reported in logs.
+#: Most durable first. This is the order a synthesised chain is built in; a
+#: stored locator is always walked in the order it was written down.
+#:
+#: ``row_cell`` sits above ``region_path`` deliberately. "The Balance on the
+#: Savings row" survives a tenant that reorders its columns; "row 1, cell 2"
+#: does not -- and it does not fail either, it quietly reads the wrong column
+#: and returns a number that looks like an answer. A rule that can be
+#: confidently wrong belongs below one that can only be right or absent.
 LOCATOR_TIERS: tuple[LocatorStrategy, ...] = (
     LocatorStrategy.ROLE_NAME,
     LocatorStrategy.LABEL_PROXIMITY,
-    LocatorStrategy.REGION_PATH,
     LocatorStrategy.ROW_CELL,
+    LocatorStrategy.REGION_PATH,
     LocatorStrategy.ANCHOR_OFFSET,
 )
 
@@ -159,6 +167,10 @@ class FailureCategory(StrEnum):
     POLICY = "policy"
     #: Caller broke the capability's contract (missing or ill-typed input).
     CONTRACT = "contract"
+    #: The capability was started from the wrong place. Distinct from a failed
+    #: checkpoint: nothing went wrong during the run, the run should not have
+    #: begun here.
+    PRECONDITION = "precondition"
     #: The surface itself broke (browser crash, navigation error).
     SURFACE_ERROR = "surface_error"
     #: Wall-clock or step budget exhausted.

@@ -317,6 +317,12 @@ def distil(
         preconditions=Preconditions(
             authenticated=True,
             entry_point=parameterise(entry_point or first_path, trace.inputs),
+            # Where the run was standing when it began. Discovery usually
+            # starts somewhere convenient and never navigates there, so
+            # without this the capability silently assumes a starting screen
+            # it never recorded -- and fails at step one, blaming its first
+            # locator, when it is replayed from anywhere else.
+            entry_checkpoint=_checkpoint_for(kept[0].landmark_before),
         ),
         steps=steps,
         success=success,

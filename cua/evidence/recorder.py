@@ -238,9 +238,12 @@ class Recorder:
         capability_id = artifact.capability.id if artifact else None
 
         if redactor is None:
-            redactor = (
-                Redactor.for_artifact(artifact) if artifact else Redactor.empty()
-            )
+            if artifact is not None:
+                redactor = Redactor.for_artifact(artifact)
+            elif mode == "discovery":
+                redactor = Redactor.for_discovery()
+            else:
+                redactor = Redactor.empty()
         if inputs:
             # Bind before anything is written, so the very first record is
             # already covered.

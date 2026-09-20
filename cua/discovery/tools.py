@@ -199,7 +199,11 @@ def action_from_tool_call(
                 "changed since you last saw it. Look again and pick a ref from "
                 "the tree above."
             )
-        target = synthesize(snapshot.tree, node)
+        # Reading a value has a stricter idea of what a description may be
+        # made of than clicking a button does.
+        target = synthesize(
+            snapshot.tree, node, reading=action_type is ActionType.EXTRACT
+        )
         if target is None:
             raise UnusableTarget(
                 f"the {node.role} at {ref!r} cannot be identified reliably "

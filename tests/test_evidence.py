@@ -496,3 +496,67 @@ def test_nothing_sensitive_reaches_any_file_in_the_bundle(tmp_path):
             body = path.read_text(encoding="utf-8")
             assert PASSWORD not in body, path
             assert MEMBER_NAME not in body, path
+
+
+# --- discovery, which has no contract to read a classification from -------
+#
+# Found by reading the evidence of the first real discovery run: the member's
+# name and their balance were both in `run.jsonl` in the clear. Not a slip --
+# redaction is driven by the artifact's `sensitivity` declarations, and during
+# discovery there is no artifact yet. Discovery is the thing that produces one.
+
+
+def test_a_discovery_run_treats_what_it_reads_as_sensitive():
+    """Nothing declared this value, and it is still not written in the clear.
+
+    The inversion that makes this work: a replay is told what is sensitive,
+    while a discovery run can only know what it *read*. So reading a value is
+    what classifies it.
+    """
+    redactor = Redactor.for_discovery()
+    redactor = redactor.bind({"savings_balance": "4,210.33"})
+
+    assert "4,210.33" not in redactor.text("the balance shown was 4,210.33")
+    assert redactor.text("4,210.33").startswith("[pii:")
+
+
+def test_discovery_redaction_does_not_shred_the_log():
+    """A blanket "every field is sensitive" default would tokenise `kind` and
+    `step_id` too, and a log nobody can read is not a safety improvement. This
+    affects the literal scrub only, never classification by name."""
+    redactor = Redactor.for_discovery()
+    record = redactor.mapping({"kind": "step", "step_id": "a3", "tier": 0})
+
+    assert record == {"kind": "step", "step_id": "a3", "tier": 0}
+
+
+def test_a_replay_still_reads_its_classification_from_the_contract():
+    """Discovery's assumption must not leak into replay, where a contract
+    exists and is the authority. `member_id` is declared `internal` and stays
+    readable."""
+    from cua.artifact.store import CapabilityStore
+
+    loaded = CapabilityStore().load("member.read_savings_balance")
+    redactor = Redactor.for_artifact(loaded, secrets=()).bind({"member_id": "10001"})
+    assert redactor.text("looking up 10001") == "looking up 10001"
+
+
+def test_discovery_evidence_cannot_cover_what_it_never_read(tmp_path):
+    """The honest limit, asserted rather than hoped for.
+
+    The model discusses the screen in prose -- "member 10001 (Dana Whitfield)
+    has a balance of..." -- and a name the run never extracted was never
+    learned, so it goes down in the clear. Masking cannot fix this; it is what
+    retention is for, and saying so is better than implying the log is safe.
+    """
+    recorder = Recorder.start(
+        mode="discovery",
+        goal="read a balance",
+        config=EvidenceConfig(root=tmp_path, screenshots=False),
+    )
+    recorder.learn({"savings_balance": "4,210.33"})
+    recorder.event("discovery_finished", summary="Dana Whitfield has 4,210.33")
+
+    log = (recorder.dir / "run.jsonl").read_text(encoding="utf-8")
+    assert "4,210.33" not in log, "a value the run read should be covered"
+    assert "Dana Whitfield" in log, "a value it only ever saw is not, and we say so"

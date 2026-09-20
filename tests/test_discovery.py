@@ -566,3 +566,94 @@ def test_a_trace_round_trips_through_disk(tmp_path, search_tree, engine):
     reloaded = DiscoveryTrace.load(path)
     assert reloaded.goal == trace.goal
     assert [r.target for r in reloaded.records] == [r.target for r in trace.records]
+
+
+# --- a locator may not be defined by the data it reads --------------------
+#
+# Found by the first genuine discovery run, not by these tests. The model
+# pointed at the balance cell, every rule verified against the live tree, and
+# the chain that came out described the number by the number: primary
+# `cell "4,210.33"`, fallback `the cell below "1,287.50"`. Both resolve
+# perfectly at record time and on exactly one member, so the first replay with
+# a different input reported itself degraded. Verification cannot catch this --
+# at record time a circular locator is a correct locator.
+
+
+def test_reading_a_value_never_records_the_value_as_the_locator(grid_tree):
+    """`cell "4,821.55"` finds this balance and no other member's.
+
+    Worse than useless at the end of a chain, too: on a later run it either
+    fails, or quietly resolves to some *other* row that happens to hold the
+    number we remembered. So it is discarded rather than demoted.
+    """
+    balance = find(grid_tree, "f0n18")
+    locator = synthesize(grid_tree, balance, reading=True)
+
+    assert locator is not None
+    described = [str(spec.model_dump()) for spec in locator.chain]
+    assert not any("4,821.55" in text for text in described), described
+
+
+def test_reading_a_value_is_not_anchored_to_the_cell_beside_it(grid_tree):
+    """"The cell below 310.00" is not a label, it is another datum.
+
+    It moves with exactly the data the locator was supposed to be independent
+    of, which is the same circularity one step removed.
+    """
+    balance = find(grid_tree, "f0n18")
+    locator = synthesize(grid_tree, balance, reading=True)
+
+    labels = [
+        spec.label
+        for spec in locator.chain
+        if isinstance(spec, LabelProximitySpec)
+    ]
+    assert not any(label in ("310.00", "S-0001", "C-0002") for label in labels)
+
+
+def test_reading_a_value_lands_on_the_rule_that_generalises(grid_tree):
+    """"The Balance on the Savings row" is the description that survives a
+    different member, a reordered column and a renamed table."""
+    locator = synthesize(grid_tree, find(grid_tree, "f0n18"), reading=True)
+
+    assert isinstance(locator.primary, RowCellSpec)
+    assert (locator.primary.row_match, locator.primary.column) == (
+        "Savings",
+        "Balance",
+    )
+
+
+def test_clicking_a_control_still_records_its_name(grid_tree):
+    """The rule is about reading, not about tables.
+
+    Clicking the cell that says "Savings" is a perfectly good thing to
+    describe by its name -- the name is what the control is called, not what
+    the run came to find out.
+    """
+    locator = synthesize(grid_tree, find(grid_tree, "f0n16"))
+    assert isinstance(locator.primary, RoleNameSpec)
+    assert locator.primary.name == "Savings"
+
+
+def test_a_value_outside_a_table_is_described_by_where_it_sits(grid_tree):
+    """A number loose on the page, with only its own text to name it.
+
+    There is still a structural answer -- where it sits inside a region we
+    found semantically -- and that is what gets recorded. What must not
+    survive is the rule that names the number after the number. If nothing at
+    all were left, `synthesize` would return `None` and the model would be
+    told to pick something else, which is the honest answer: "we cannot say
+    where this is, only what it says" is not a locator.
+    """
+    lone = node(
+        "document",
+        "Report",
+        children=[node("text", "4,821.55", box=(10, 10, 60, 18), ref="f0n1")],
+    )
+    reading = synthesize(lone, find(lone, "f0n1"), reading=True)
+    assert reading.primary.strategy is LocatorStrategy.REGION_PATH
+    assert not any(
+        "4,821.55" in str(spec.model_dump()) for spec in reading.chain
+    )
+    # ...and it is named perfectly well when it is a thing to click.
+    assert synthesize(lone, find(lone, "f0n1")).primary.name == "4,821.55"

@@ -1,0 +1,72 @@
+# What the automation is permitted to do.
+#
+# Checked in the repo on purpose. Permissions granted to something that drives
+# bank software unattended should change through review, not through whoever
+# last edited a config on a box.
+#
+# Two gates, evaluated in order, both before the action happens:
+#   allowlist  -- where we may act, and what kinds of action exist at all
+#   risk       -- how much consequence may occur without a person agreeing
+
+allowlist:
+  # scheme://host:port. 5000 is the base tenant, 5001 the reskinned variant.
+  origins:
+    - http://localhost:5000
+    - http://127.0.0.1:5000
+    - http://localhost:5001
+    - http://127.0.0.1:5001
+
+  # `*` stops at a path separator, `**` crosses it. So /members/** covers
+  # /members/10001/subaccount/new, while a single star would not -- and, more
+  # to the point, a single star is not quietly permitting everything below.
+  #
+  # Note what is absent: /debug/**. Those endpoints exist so a demo can
+  # summon failure states, and the agent has no business reaching for them.
+  # A run that could expire its own session or slow its own page down would
+  # make the error taxonomy untestable in the one way that matters.
+  paths:
+    - /
+    - /home
+    - /members/**
+
+  # The closed set of things the system can do. Anything not listed cannot be
+  # performed even where it would otherwise be allowed.
+  actions:
+    - navigate
+    - click
+    - type
+    - select
+    - press_key
+    - extract
+    - wait_for
+
+risk:
+  # Safe and caution run unattended. Irreversible does not.
+  #
+  # The brief offers block, confirm or flag for the risky class. This is
+  # confirm. Blocking would make the write capability useless for the only
+  # thing it exists to do; flagging is far too weak for opening an account.
+  # Requiring agreement keeps the capability useful and the decision human,
+  # and it reuses the escalation path already built for handing over a live
+  # session.
+  unattended_max: caution
+
+  # Nothing is refused outright here. A deployment that wanted read-only
+  # capabilities would set this to [irreversible] and no approval would
+  # override it.
+  blocked: []
+
+  # Control names that make a click irreversible when nothing has classified
+  # it -- which is the situation during discovery, against an application the
+  # model has not seen before. Being wrong this way costs an approval prompt;
+  # being wrong the other way opens an account.
+  irreversible_hints:
+    - confirm
+    - submit
+    - commit
+    - delete
+    - remove
+    - transfer
+    - post
+    - approve
+    - authorize

@@ -1,0 +1,30 @@
+{% extends "_layout.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block heading %}{{ title }}{% endblock %}
+
+{% block body %}
+{# Both the known maintenance notice and the compliance hold render through
+   here, and they are deliberately distinguishable only by their name. A
+   recovery declared for `dialog "System Notice"` must not match a compliance
+   hold: one is noise to click through, the other is a blocking condition that
+   a person has to decide about. Making them structurally identical is the
+   point -- it stops a detector from getting the answer right by accident. #}
+<div role="dialog" aria-label="{{ title }}" class="dlg">
+  <table class="dlgtbl" cellspacing="0" cellpadding="10" border="0" width="460">
+  <tr>
+    <td>
+      <span id="ctl00_ContentPlaceHolder1_lblDlgText" class="dlgtext">{{ body }}</span>
+    </td>
+  </tr>
+  <tr>
+    <td align="right">
+      <form method="post" action="{{ action }}">
+        <input type="submit" value="{{ button }}"
+               name="ctl00$ContentPlaceHolder1$btnDlgAction"
+               id="ctl00_ContentPlaceHolder1_btnDlgAction" class="btn btnprimary">
+      </form>
+    </td>
+  </tr>
+  </table>
+</div>
+{% endblock %}

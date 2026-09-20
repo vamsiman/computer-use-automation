@@ -29,12 +29,13 @@ are a mix, so this one is too.
 from __future__ import annotations
 
 import os
+import time
 from datetime import date
 from functools import wraps
 
 from flask import Flask, g, redirect, render_template, request, session, url_for
 
-from targetapp import data, tenants
+from targetapp import data, exceptional, tenants
 
 # Shared with the automation's auth bootstrap, which reads the same variables.
 # Demo credentials only; a real system would never hold these in code.
@@ -88,6 +89,20 @@ def create_app() -> Flask:
     def _open_db() -> None:
         g.db = data.connect()
 
+    @app.before_request
+    def _maybe_stall() -> None:
+        """Honour a one-shot slow render armed by /debug/slow.
+
+        One-shot rather than sticky, because the condition we want to
+        reproduce is a transient stall that a bounded retry recovers from --
+        not an app that is permanently down, which is a hard failure.
+        """
+        if request.path.startswith(("/static", "/debug")):
+            return
+        delay_ms = session.pop("slow_ms", 0)
+        if delay_ms:
+            time.sleep(min(int(delay_ms), 30000) / 1000)
+
     @app.teardown_request
     def _close_db(exc: BaseException | None) -> None:
         db = g.pop("db", None)
@@ -102,12 +117,53 @@ def create_app() -> Flask:
             "acct_cell": _acct_cell,
         }
 
+    def _search_with_message(message: str, entered: str):
+        """Bounce back to the search screen carrying a message.
+
+        All three declared business outcomes -- not found, bad format,
+        permission denied -- surface this way, as an alert on the search
+        screen. Uniform on purpose: it lets an artifact declare all three
+        detectors in the same shape, and it is what these apps actually do
+        rather than routing you to a bespoke error page per condition.
+        """
+        return render_template("search.html", message=message, entered=entered)
+
     def _no_such_member(entered: str):
-        # Proper not-found and validation messaging arrives with the
-        # exceptional-state work. This is the seam it plugs into.
-        return render_template(
-            "search.html", message="No records found.", entered=entered
-        )
+        return _search_with_message(exceptional.MSG_NOT_FOUND, entered)
+
+    def _gate_member(member):
+        """Interpose the exceptional states that guard a member record.
+
+        Returns a response to send instead of the detail page, or None to
+        carry on. Order matters: a permission denial is a final answer, while
+        the two dialogs are things standing in front of a record we are
+        otherwise allowed to see.
+        """
+        member_no = member["member_no"]
+        flags = member["flags"]
+
+        if flags == "restricted":
+            return _search_with_message(exceptional.MSG_PERMISSION, member_no)
+
+        if flags == "notice" and not session.get(f"notice_seen_{member_no}"):
+            return render_template(
+                "interstitial.html",
+                title=exceptional.NOTICE_TITLE,
+                body=exceptional.NOTICE_BODY,
+                button=exceptional.NOTICE_BUTTON,
+                action=f"/members/{member_no}/dismiss-notice",
+            )
+
+        if flags == "compliance_hold" and not session.get(f"hold_ack_{member_no}"):
+            return render_template(
+                "interstitial.html",
+                title=exceptional.HOLD_TITLE,
+                body=exceptional.HOLD_BODY,
+                button=exceptional.HOLD_BUTTON,
+                action=f"/members/{member_no}/acknowledge-hold",
+            )
+
+        return None
 
     @app.route("/", methods=["GET", "POST"])
     def signin():
@@ -116,14 +172,28 @@ def create_app() -> Flask:
                 return redirect(url_for("home"))
             return render_template("signin.html", framed=False, message=None)
 
-        if request.form.get("user") == APP_USER and (
-            request.form.get("pwd") == APP_PASS
-        ):
+        user = (request.form.get("user") or "").strip()
+
+        # Checked before the credentials: once locked, a correct password does
+        # not help. That is the point of a lockout, and it makes this a hard
+        # failure for the auth bootstrap rather than something to retry.
+        if exceptional.is_locked(user):
+            return render_template(
+                "signin.html", framed=False, message=exceptional.MSG_LOCKED
+            )
+
+        if user == APP_USER and request.form.get("pwd") == APP_PASS:
+            exceptional.clear_signin_failures(user)
             session["user"] = APP_USER
             return redirect(url_for("home"))
-        return render_template(
-            "signin.html", framed=False, message="Invalid user ID or password."
+
+        exceptional.record_signin_failure(user)
+        message = (
+            exceptional.MSG_LOCKED
+            if exceptional.is_locked(user)
+            else "Invalid user ID or password."
         )
+        return render_template("signin.html", framed=False, message=message)
 
     @app.route("/logout")
     def logout():
@@ -143,6 +213,11 @@ def create_app() -> Flask:
             return render_template("search.html", message=None, entered="")
 
         entered = (request.form.get("mbr") or "").strip()
+
+        problem = exceptional.validate_member_id(entered)
+        if problem:
+            return _search_with_message(problem, entered)
+
         member = data.get_member(g.db, entered)
         if member is None:
             return _no_such_member(entered)
@@ -154,11 +229,67 @@ def create_app() -> Flask:
         member = data.get_member(g.db, member_no)
         if member is None:
             return _no_such_member(member_no)
+
+        gated = _gate_member(member)
+        if gated is not None:
+            return gated
+
         return render_template(
             "detail.html",
             member=member,
             accounts=data.get_accounts(g.db, member_no),
         )
+
+    @app.route("/members/<member_no>/dismiss-notice", methods=["POST"])
+    @login_required
+    def dismiss_notice(member_no: str):
+        session[f"notice_seen_{member_no}"] = True
+        return redirect(url_for("member_detail", member_no=member_no))
+
+    @app.route("/members/<member_no>/acknowledge-hold", methods=["POST"])
+    @login_required
+    def acknowledge_hold(member_no: str):
+        """Clearing a compliance hold is a person's decision.
+
+        Nothing stops the automation pressing this button -- the app cannot
+        tell who is clicking. Keeping it out of unattended reach is the
+        automation's job, via the undeclared-state escalation path, which is
+        exactly the seam this member is here to exercise.
+        """
+        session[f"hold_ack_{member_no}"] = True
+        return redirect(url_for("member_detail", member_no=member_no))
+
+    # --- deterministic triggers ------------------------------------------
+    #
+    # Conditions a real system produces by accident, exposed here as explicit
+    # endpoints so a demo can summon them on cue. This is the payoff for
+    # owning the target: session expiry and transient slowness are otherwise
+    # untestable, and an error taxonomy you cannot demonstrate is a claim
+    # rather than a result.
+
+    @app.route("/debug/expire")
+    def debug_expire():
+        """Drop the session without signing out.
+
+        The next framed request then renders sign-in *inside the frame*,
+        which is how mid-flow expiry actually presents and what the
+        reauthenticate-and-resume recovery keys off.
+        """
+        session.pop("user", None)
+        return {"expired": True}
+
+    @app.route("/debug/slow")
+    def debug_slow():
+        """Arm a one-shot stall on the next page render."""
+        session["slow_ms"] = int(request.args.get("ms", 8000))
+        return {"slow_ms": session["slow_ms"]}
+
+    @app.route("/debug/reset")
+    def debug_reset():
+        """Clear lockouts, dismissals and arming flags so demos start clean."""
+        exceptional.reset_all()
+        session.clear()
+        return {"reset": True}
 
     @app.route("/members/<member_no>/subaccount/new")
     @login_required

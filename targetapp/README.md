@@ -72,9 +72,54 @@ Every name is invented. There is no real PII in this project.
 a different failure from "no such member" and the system has to report it
 differently.
 
-The `flags` column is seeded but not yet acted on — the exceptional states it
-drives are wired up in the next issue, which also documents the full trigger table
-here.
+## Trigger table
+
+The brief is explicit that the hard part of replay is not layout drift — these UIs
+are stable — but the runtime conditions that legitimately occur. So every one of
+them is reachable here, deterministically, on demand. This is the payoff for
+owning the target: you cannot ask someone else's server to expire your session on
+cue.
+
+| Trigger | What happens | Class |
+|---|---|---|
+| `10001`, `10002` | Member details with balances | happy path |
+| `abc`, `123`, `""`, `1234567` | "Member ID must be 5 digits." | business outcome — `VALIDATION_ERROR` |
+| `99999` | "No records found." | business outcome — `MEMBER_NOT_FOUND` |
+| `10003` | "You are not authorized to view this member." | business outcome — `PERMISSION_DENIED` |
+| `10004` | `System Notice` interstitial before the detail | **recoverable** — dismiss via `Continue` |
+| `GET /debug/slow?ms=8000` | One-shot stall on the next render | **recoverable** — retry with backoff |
+| `GET /debug/expire` | Session dropped; sign-in renders *in the frame* | **recoverable** — re-authenticate and resume |
+| `10005` | `Compliance Hold`, single `Acknowledge` button | **undeclared** — escalate to a human |
+| `10006` | Member visible, but no savings row to read | hard failure — extract target absent |
+| 3 failed sign-ins | Account locks; correct password stops working | hard failure — survives a fresh session |
+| `GET /debug/reset` | Clears lockouts, dismissals and arming flags | — |
+
+Message strings live in `exceptional.py` and are part of the contract: artifacts
+declare detectors against them, so changing the wording breaks every artifact
+recorded against this app. That is itself a faithful reproduction of what a vendor
+upgrade does to real automation.
+
+### Why these particular distinctions
+
+**Malformed vs unknown.** `abc` and `99999` are different conditions. One means the
+caller sent garbage; the other is a legitimate answer about the world. Validation
+runs before lookup so the two can never be conflated.
+
+**Notice vs hold.** `10004` and `10005` render through the *same template*, with the
+same roles, the same control ids and the same layout. They differ only by name.
+That is deliberate: a recovery declared for `dialog "System Notice"` must not
+swallow a compliance hold by accident. One is noise to click through unattended;
+the other is a blocking condition a person has to decide about. Making them
+structurally identical stops a detector from being right by luck.
+
+Nothing in the app stops automation pressing `Acknowledge` — the server cannot tell
+who is clicking. Keeping that button out of unattended reach is the automation's
+job, which is precisely the seam `10005` exists to exercise.
+
+**Lockout survives a fresh session.** Deliberately module-level rather than
+session-scoped, so retrying with new cookies does not clear it. That makes it a
+hard failure for the auth bootstrap rather than something a recovery can paper
+over.
 
 ## The markup is hostile on purpose
 

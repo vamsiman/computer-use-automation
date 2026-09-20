@@ -46,6 +46,21 @@ def model_name() -> str:
     return os.environ.get("CUA_MODEL") or DEFAULT_MODEL
 
 
+def landmark(snapshot: Snapshot) -> str | None:
+    """The most identifying thing on screen, recorded per turn.
+
+    A tree hash says two screens differ; it cannot say what the second one is.
+    Distillation needs the second thing to write a checkpoint, and a checkpoint
+    is the difference between replay verifying a step and replay assuming it
+    worked. The page heading is the cheapest durable answer -- it is what a
+    person would name the screen by.
+    """
+    for node in snapshot.tree.walk():
+        if node.role == "heading" and node.name:
+            return f"heading:{node.name}"
+    return f"location:{snapshot.location}" if snapshot.location else None
+
+
 # --- the seam -------------------------------------------------------------
 
 
@@ -223,6 +238,7 @@ class DiscoveryAgent:
                         intent=summary,
                         location_before=snapshot.location,
                         tree_before=tree_hash(snapshot),
+                        landmark_before=landmark(snapshot),
                     )
                 )
                 return self._end(trace, call.name, summary)  # type: ignore[arg-type]
@@ -234,6 +250,7 @@ class DiscoveryAgent:
                 ref=call.args.get("ref"),
                 location_before=snapshot.location,
                 tree_before=tree_hash(snapshot),
+                landmark_before=landmark(snapshot),
             )
 
             # --- build the action ---------------------------------------
@@ -246,6 +263,7 @@ class DiscoveryAgent:
                 messages.append(self._tool_result(call, render_refusal(str(exc))))
                 continue
 
+            record.action = action
             record.target = (
                 action.target.describe() if action.target is not None else None
             )
@@ -311,6 +329,7 @@ class DiscoveryAgent:
             snapshot = result.observed or self.surface.observe()
             record.location_after = snapshot.location
             record.tree_after = tree_hash(snapshot)
+            record.landmark_after = landmark(snapshot)
             trace.add(record)
 
             if record.ok and action.type is ActionType.EXTRACT:

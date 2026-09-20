@@ -344,11 +344,12 @@ def test_the_synthesised_locators_still_resolve_on_a_fresh_page(discovered):
     fresh = surface.observe()
 
     typed = next(r for r in trace.records if r.tool == "type")
-    assert typed.action is None  # the trace records the description, not the object
+    assert typed.action is not None
+    assert not re.search(r"f\d+n\d+", typed.action.target.describe())
 
-    # Rebuild from the recorded description by re-running synthesis on the new
-    # page, then confirm the recorded locator text matches what we would record
-    # again -- i.e. the description is stable across page loads.
+    # Re-run synthesis against the new page and confirm we would record the
+    # same description -- i.e. the description is a property of the screen, not
+    # of the snapshot it was born from.
     from cua.discovery.locate import synthesize
 
     field = next(
@@ -391,3 +392,97 @@ def test_a_refused_navigation_does_not_happen_live(browser, engine):
     assert trace.records[0].ok is False
     assert trace.records[0].policy_rule.startswith("allowlist")
     assert "Sign In" not in browser.observe().text_view()
+
+
+# --- distillation, end to end --------------------------------------------
+
+
+def test_the_run_distils_into_a_capability_that_validates(discovered):
+    """The whole point of the run: not that it worked, but that what it leaves
+    behind is a contract somebody else can call."""
+    from cua.artifact.models import AppRef
+    from cua.artifact.validate import validate_or_raise
+    from cua.discovery import distil
+
+    trace, _surface, _rec = discovered
+    artifact = distil(
+        trace,
+        capability_id="member.read_savings_balance",
+        app=AppRef(vendor="meridian", product="MemberConsole"),
+    )
+    validate_or_raise(artifact)
+
+    assert artifact.capability.status == "draft"
+    assert artifact.success.require_outputs == ["member_name", "savings_balance"]
+    assert artifact.capability.provenance.step_count_raw >= len(artifact.steps)
+
+
+def test_the_member_number_became_a_parameter(discovered):
+    """Before this pass the artifact is a recording of one answer. After it,
+    it is a function."""
+    from cua.discovery import distil
+
+    trace, _surface, _rec = discovered
+    artifact = distil(trace, capability_id="member.read_savings_balance")
+    typed = next(s for s in artifact.steps if s.action is ActionType.TYPE)
+
+    assert typed.args["value"] == "{{ inputs.member_id }}"
+    assert "10001" not in str(typed.args)
+    assert artifact.inputs["member_id"].pattern == "^[0-9]{5}$"
+
+
+def test_every_distilled_locator_resolves_on_a_freshly_loaded_screen(discovered):
+    """The claim the artifact makes, checked against the live application.
+
+    Each step's locator is resolved on a page loaded after the run finished,
+    in order, driving the flow as replay would. A capability whose locators
+    only work on the snapshot they were born from is the failure this design
+    exists to prevent, and this is where it would show.
+    """
+    from cua.discovery import distil
+    from cua.primitives import Action
+
+    trace, surface, _rec = discovered
+    artifact = distil(trace, capability_id="member.read_savings_balance")
+
+    tiers: dict[str, int] = {}
+    strategies: dict[str, LocatorStrategy] = {}
+    for step in artifact.steps:
+        if step.target is None:
+            surface.act(Action(type=step.action, args=step.args))
+            continue
+        resolution = surface.resolve(step.target)
+        assert resolution.resolved, f"{step.id} ({step.intent}) did not resolve"
+        tiers[step.id] = resolution.tier
+        strategies[step.id] = resolution.strategy
+        if step.action is ActionType.TYPE:
+            surface.act(
+                Action(type=step.action, target=step.target, args={"value": "10001"})
+            )
+        elif step.action is ActionType.CLICK:
+            surface.act(Action(type=step.action, target=step.target))
+
+    # Tier is an index into each locator's own chain, so "tier 0" means the
+    # primary rule still works -- healthy, not necessarily semantic. The
+    # cross-locator claim is about which *strategy* won.
+    assert all(tier == 0 for tier in tiers.values()), tiers
+    assert strategies["s2"] is LocatorStrategy.LABEL_PROXIMITY, (
+        "this field has no accessible name, so the label is doing the work"
+    )
+    assert strategies["s3"] is LocatorStrategy.ROLE_NAME
+
+
+def test_the_capability_survives_being_written_down(discovered, tmp_path):
+    from cua.artifact.store import CapabilityStore
+    from cua.discovery import distil
+
+    trace, _surface, _rec = discovered
+    artifact = distil(trace, capability_id="member.read_savings_balance")
+
+    store = CapabilityStore(tmp_path)
+    store.save(artifact)
+    reloaded = store.load("member.read_savings_balance")
+
+    assert reloaded.ref == artifact.ref
+    assert [s.intent for s in reloaded.steps] == [s.intent for s in artifact.steps]
+    assert reloaded.steps[1].target.describe() == artifact.steps[1].target.describe()

@@ -76,6 +76,12 @@ class TraceRecord(BaseModel):
     value: str | None = None
     location_before: str | None = None
     location_after: str | None = None
+    #: The most identifying thing on screen after the action, as
+    #: ``heading:Member Details``. Distillation turns a change of landmark
+    #: into a checkpoint, which is what makes replay verify a step rather than
+    #: assume it worked.
+    landmark_before: str | None = None
+    landmark_after: str | None = None
     tree_before: str | None = None
     tree_after: str | None = None
     screenshot_ref: str | None = None

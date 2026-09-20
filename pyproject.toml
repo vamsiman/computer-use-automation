@@ -1,0 +1,29 @@
+[project]
+name = "cua"
+version = "0.1.0"
+description = "Record-once / replay-many computer-use automation for legacy back-office apps"
+requires-python = ">=3.11"
+dependencies = [
+    "pydantic>=2.6",
+    "pyyaml>=6.0",
+    "playwright>=1.44",
+    "anthropic>=0.34",
+    "flask>=3.0",
+    "typer>=0.12",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "pytest-asyncio>=0.23"]
+
+[project.scripts]
+cua = "cua.cli.main:app"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["cua*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

@@ -13,6 +13,7 @@ honest way to do that is to leave the window on screen and stop driving it.
 from __future__ import annotations
 
 import os
+import threading
 import time
 from pathlib import Path
 from urllib.parse import urljoin, urlparse
@@ -266,8 +267,44 @@ class WebSurface:
             pass
 
 
+_DRIVER_LOCK = threading.Lock()
+_DRIVER = None
+
+
+def _driver():
+    """The single Playwright driver for this process.
+
+    One driver, many browsers. Starting ``sync_playwright()`` per session
+    looks harmless and is not: each start spawns its own node driver and
+    installs its own event loop, and a process that accumulates several ends
+    up deadlocked with orphaned browsers still running. That is not a
+    theoretical risk -- it is what happened here the first time the session
+    manager created a browser per run.
+
+    The session manager exists precisely to hold many concurrent sessions, so
+    the driver has to be shared and the browsers kept separate.
+    """
+    global _DRIVER
+    with _DRIVER_LOCK:
+        if _DRIVER is None:
+            _DRIVER = sync_playwright().start()
+        return _DRIVER
+
+
+def shutdown_driver() -> None:
+    """Stop the shared driver. For process teardown and test fixtures."""
+    global _DRIVER
+    with _DRIVER_LOCK:
+        if _DRIVER is not None:
+            try:
+                _DRIVER.stop()
+            except Exception:
+                pass
+            _DRIVER = None
+
+
 class BrowserSession:
-    """Owns a Playwright browser for the lifetime of a session.
+    """Owns a browser for the lifetime of a session.
 
     Exists so the browser outlives any single function call. That is the
     change that makes a human handoff possible at all: something other than
@@ -277,26 +314,22 @@ class BrowserSession:
     def __init__(self, base_url: str, headless: bool | None = None) -> None:
         self.base_url = base_url
         self.headless = headless_default() if headless is None else headless
-        self._pw = None
         self._browser: Browser | None = None
 
     def start(self, screenshot_dir: str | Path | None = None) -> WebSurface:
-        self._pw = sync_playwright().start()
-        self._browser = self._pw.chromium.launch(headless=self.headless)
+        self._browser = _driver().chromium.launch(headless=self.headless)
         context = self._browser.new_context(viewport={"width": 1280, "height": 900})
         page = context.new_page()
         return WebSurface(page, self.base_url, screenshot_dir)
 
     def stop(self) -> None:
-        for closer in (
-            getattr(self._browser, "close", None),
-            getattr(self._pw, "stop", None),
-        ):
-            if closer:
-                try:
-                    closer()
-                except Exception:
-                    pass
+        """Close this session's browser, leaving the shared driver running."""
+        if self._browser is not None:
+            try:
+                self._browser.close()
+            except Exception:
+                pass
+            self._browser = None
 
     def __enter__(self) -> WebSurface:
         self._surface = self.start()

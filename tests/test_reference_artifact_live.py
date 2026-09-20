@@ -45,7 +45,7 @@ def live_app():
     seed.seed()
     exceptional.reset_all()
     port = _free_port()
-    server = make_server("127.0.0.1", port, create_app())
+    server = make_server("127.0.0.1", port, create_app(), threaded=True)
     threading.Thread(target=server.serve_forever, daemon=True).start()
     try:
         yield f"http://127.0.0.1:{port}"

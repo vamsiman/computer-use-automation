@@ -36,7 +36,7 @@ Working agreement: one issue per session. On completion, write a handoff to
 | 3 | Target app: failure modes and triggers | #4 | 2 | done |
 | 4 | Surface abstraction, WebSurface, locator engine | #5 | 1, 2 | done |
 | 5 | Artifact schema, store, validator | #6 | 1, 4 | done |
-| 6 | Session manager, control token, auth bootstrap | #7 | 1, 4 | todo |
+| 6 | Session manager, control token, auth bootstrap | #7 | 1, 4 | done |
 | 7 | Policy engine: allowlist and risk gating | #8 | 1, 5 | todo |
 | 8 | Evidence recorder and declarative redaction | #9 | 1, 5 | todo |
 | 9 | Discovery engine: LLM observe/decide/act loop | #10 | 4, 5, 6, 7, 8 | todo |

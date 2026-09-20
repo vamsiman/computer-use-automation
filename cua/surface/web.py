@@ -260,6 +260,29 @@ class WebSurface:
         self.page.screenshot(path=path, full_page=False)
         return path
 
+    def page_source(self) -> str:
+        """Raw markup of the main document and every frame inside it.
+
+        Not part of the Surface protocol, and deliberately so: a desktop
+        driver has no such thing, and requiring one would make the protocol
+        describe a browser rather than a surface. The recorder asks for it by
+        duck-typing and does without when it is absent, which is the right
+        shape for a capability only some surfaces have.
+
+        Captured on failure only. Markup carries values the accessibility tree
+        elides -- hidden fields, full account numbers, view state -- so it is
+        the richest thing here and separately gated in the evidence config.
+        """
+        parts = []
+        for frame in self.page.frames:
+            try:
+                parts.append(f"<!-- frame: {frame.url} -->\n{frame.content()}")
+            except Exception:
+                # A frame that has navigated out from under us is not worth
+                # failing an evidence capture over.
+                continue
+        return "\n\n".join(parts)
+
     def close(self) -> None:
         try:
             self.page.close()

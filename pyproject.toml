@@ -27,3 +27,6 @@ include = ["cua*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+    "browser: needs a Playwright browser installed (playwright install chromium)",
+]

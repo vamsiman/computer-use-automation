@@ -166,3 +166,15 @@ Only `base` exists today. The `riverbend` variant — same vendor product, diffe
 branding, `Member ID:` renamed to `Member Number:`, columns reordered — is added
 with the cross-tenant reuse work, where the point is to replay one artifact
 against both.
+
+## Browser setup
+
+The surface tests need Chromium **and** the headless shell, which is a separate
+download:
+
+```bash
+playwright install chromium
+playwright install chromium-headless-shell   # only needed for CUA_HEADLESS=1
+```
+
+Without them, `pytest -m "not browser"` still runs everything else.

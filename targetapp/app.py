@@ -99,7 +99,16 @@ def create_app() -> Flask:
         """
         if request.path.startswith(("/static", "/debug")):
             return
+        # Optionally scoped to one path. Without that the stall always lands
+        # on whichever render happens next, which in practice is the first
+        # navigation of a run -- and a capability that stalls on its opening
+        # page is a much less interesting condition than one that stalls
+        # halfway through, with a half-finished flow behind it.
+        wanted = session.get("slow_path")
+        if wanted and request.path != wanted:
+            return
         delay_ms = session.pop("slow_ms", 0)
+        session.pop("slow_path", None)
         if delay_ms:
             time.sleep(min(int(delay_ms), 30000) / 1000)
 
@@ -280,9 +289,19 @@ def create_app() -> Flask:
 
     @app.route("/debug/slow")
     def debug_slow():
-        """Arm a one-shot stall on the next page render."""
+        """Arm a one-shot stall on the next page render.
+
+        ``?path=/members/10001`` narrows it to that page, so a demo can stall
+        the step it wants to stall rather than the one that happens to come
+        first.
+        """
         session["slow_ms"] = int(request.args.get("ms", 8000))
-        return {"slow_ms": session["slow_ms"]}
+        wanted = request.args.get("path")
+        if wanted:
+            session["slow_path"] = wanted
+        else:
+            session.pop("slow_path", None)
+        return {"slow_ms": session["slow_ms"], "slow_path": wanted}
 
     @app.route("/debug/reset")
     def debug_reset():

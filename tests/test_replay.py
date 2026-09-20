@@ -614,3 +614,94 @@ def test_replay_imports_no_model_client():
         )
         for name in banned:
             assert f"import {name}" not in source, (module.name, name)
+
+
+# --- the retry strategy, where it genuinely applies -----------------------
+
+
+def test_retry_with_backoff_waits_for_a_declared_wait_screen(artifact, engine_policy):
+    """The reference capability declares no SLOW_LOAD recovery, because a
+    stall has nothing of its own to detect and a checkpoint already polls to a
+    deadline. The strategy is still in the vocabulary for the applications
+    that do render an explicit wait screen -- where there is something real to
+    detect -- so it is proved here against one.
+    """
+    from cua.artifact.models import Recovery
+
+    artifact.recoveries = [
+        Recovery(
+            code="PLEASE_WAIT",
+            detect=Locator(
+                primary=RoleNameSpec(role="heading", name="Please Wait")
+            ),
+            strategy="retry_with_backoff",
+            max_occurrences=2,
+            backoff_ms=1,
+        )
+    ]
+    surface = FakeSurface(
+        [
+            screen("Member Search"),
+            screen("Member Search"),
+            screen("Please Wait"),
+            screen("Member Details"),
+        ],
+        values={"member_name": "Dana Whitfield", "savings_balance": "4,210.33"},
+        advance_on=(ActionType.NAVIGATE, ActionType.CLICK, ActionType.WAIT_FOR),
+    )
+
+    # The wait screen clears on its own after a few looks, the way one does.
+    original = surface.observe
+    looks = {"count": 0}
+
+    def observe():
+        if surface.index == 2:
+            looks["count"] += 1
+            if looks["count"] > 3:
+                surface.index = 3
+        return original()
+
+    surface.observe = observe
+    result = run(artifact, surface, engine_policy)
+
+    assert isinstance(result, Success)
+    assert "PLEASE_WAIT" in " ".join(result.recoveries)
+
+
+def test_a_step_with_a_checkpoint_trusts_the_checkpoint_over_the_driver(
+    artifact, engine_policy
+):
+    """A slow render makes the browser report a timeout for a click that went
+    through. The world is the authority on whether the step worked."""
+    surface = FakeSurface(HAPPY_PATH, values={"member_name": "D", "savings_balance": "1.00"})
+    original_act = surface.act
+
+    def act(action):
+        result = original_act(action)
+        if action.type is ActionType.CLICK:
+            return ActResult(ok=False, error="TimeoutError: waiting for navigation")
+        return result
+
+    surface.act = act
+    result = run(artifact, surface, engine_policy)
+
+    assert isinstance(result, Success), getattr(result, "observed", result)
+
+
+def test_a_step_without_a_checkpoint_has_only_the_drivers_word(
+    artifact, engine_policy
+):
+    """Which is the argument for declaring one."""
+    surface = FakeSurface(HAPPY_PATH)
+    original_act = surface.act
+
+    def act(action):
+        if action.type is ActionType.TYPE:  # s2 has no checkpoint
+            return ActResult(ok=False, error="element is not editable")
+        return original_act(action)
+
+    surface.act = act
+    result = run(artifact, surface, engine_policy)
+
+    assert isinstance(result, Failure)
+    assert result.step_id == "s2"

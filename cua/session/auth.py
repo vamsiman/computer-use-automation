@@ -104,6 +104,10 @@ MEMBER_CONSOLE = AuthProfile(
         fallbacks=(LabelProximitySpec(label="Password:", direction="right"),),
     ),
     submit=_role("button", "Sign In"),
+    #: Where a fresh sign-in lands. Not used to *decide* whether we are
+    #: authenticated -- a session can drop anywhere, and this names one
+    #: screen -- but it is the profile's statement of where the front door
+    #: leads.
     signed_in=_role("heading", "Member Search"),
     sign_in_form=_role("heading", "Sign In"),
     locked=_alert_containing("Account locked"),
@@ -136,6 +140,36 @@ def _is_blank(snapshot) -> bool:
     )
 
 
+def _looks_like_the_application(snapshot) -> bool:
+    """Are we on a page this application rendered?
+
+    Deliberately generic: a session can drop anywhere, so this cannot key on
+    one particular screen. Every page of the console renders its title as a
+    real heading, and nothing outside it does -- a JSON body from a debug
+    endpoint has no heading, and neither does a blank tab. It is a weaker
+    signal than naming a screen, and it is the strongest one that is true
+    everywhere the question gets asked.
+    """
+    return any(
+        node.role == "heading" and node.name for node in snapshot.tree.walk()
+    )
+
+
+def _recognised(surface: Surface, snapshot, profile: AuthProfile) -> bool:
+    """Are we looking at something this profile knows how to reason about?
+
+    Either the sign-in form or a screen of the application. Anything else --
+    a blank tab, a JSON body, a proxy error -- is not evidence either way, and
+    the only honest response is to go somewhere we understand before deciding.
+    """
+    if _is_blank(snapshot):
+        return False
+    return (
+        surface.resolve(profile.sign_in_form, snapshot).resolved
+        or _looks_like_the_application(snapshot)
+    )
+
+
 def is_authenticated(surface: Surface, profile: AuthProfile = MEMBER_CONSOLE) -> bool:
     """True when the current page is in the application and not asking us to
     sign in.
@@ -149,7 +183,14 @@ def is_authenticated(surface: Surface, profile: AuthProfile = MEMBER_CONSOLE) ->
     snapshot = surface.observe()
     if _is_blank(snapshot):
         return False
-    return not surface.resolve(profile.sign_in_form, snapshot).resolved
+    if surface.resolve(profile.sign_in_form, snapshot).resolved:
+        return False
+    # Confirmed positively, not inferred. A page that is neither the sign-in
+    # form nor a screen of the application -- a JSON response from a debug
+    # endpoint, an error page, anything at all -- says nothing about our
+    # session, and reading it as "signed in" is the same mistake as reading a
+    # blank tab that way.
+    return _looks_like_the_application(snapshot)
 
 
 def authenticate(
@@ -166,9 +207,10 @@ def authenticate(
     credentials = credentials or Credentials.from_env()
 
     snapshot = surface.observe()
-    if _is_blank(snapshot):
-        # Nowhere yet. Go to the entry point before drawing any conclusion
-        # about whether we are signed in.
+    if not _recognised(surface, snapshot, profile):
+        # Nowhere we recognise -- a blank tab, or a page that is neither the
+        # sign-in form nor the application. Go to the entry point before
+        # drawing any conclusion about whether we are signed in.
         surface.act(
             Action(type=ActionType.NAVIGATE, args={"path": profile.entry_path})
         )

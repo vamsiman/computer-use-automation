@@ -338,7 +338,16 @@ class ReplayEngine:
         if detected.outcome is not None:
             return _StepOutcome(result=self._business(detected.outcome, step))
 
-        if result.ok and self._verify(step.checkpoint):
+        # The checkpoint is the authority on whether the step worked, not the
+        # driver's return value. A slow legacy render makes the browser report
+        # a timeout for a click that went through perfectly well, and trusting
+        # the driver over the world turns a run that succeeded into a failure
+        # report. Where there is no checkpoint the driver's word is all we
+        # have -- which is itself the argument for declaring one.
+        if step.checkpoint is not None:
+            if self._verify(step.checkpoint):
+                return _StepOutcome()
+        elif result.ok:
             return _StepOutcome()
 
         # --- only now, when something is wrong ---------------------------

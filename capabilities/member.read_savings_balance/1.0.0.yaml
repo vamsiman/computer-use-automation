@@ -186,15 +186,16 @@ recoveries:
     max_occurrences: 1
     resume_from: s1
 
-  # Recoveries are only consulted once a checkpoint has failed to hold, which
-  # is what lets this detector be so plain: if the submit went through and we
-  # are still looking at the search screen, the next page has not arrived yet.
-  # A slow render has nothing of its own to detect -- the symptom is the
-  # absence of what we were waiting for -- so the signal is the screen we have
-  # not left.
-  - code: SLOW_LOAD
-    detect:
-      primary: {strategy: role_name, role: heading, name: Member Search}
-    strategy: retry_with_backoff
-    max_occurrences: 3
-    backoff_ms: 750
+  # No SLOW_LOAD recovery, and the absence is deliberate.
+  #
+  # A transient stall has nothing of its own to detect: the symptom is the
+  # absence of the thing we were waiting for. And a checkpoint already polls
+  # until its deadline, so it *is* a bounded retry -- declaring a separate
+  # recovery for slowness would duplicate the mechanism and key it on a screen
+  # that, in this application, never becomes observable (the driver's own
+  # observation blocks until the navigation completes).
+  #
+  # The `retry_with_backoff` strategy stays in the vocabulary for the
+  # applications that do render an explicit "please wait" screen, where there
+  # is something real to detect. Here, the right answer is a checkpoint
+  # timeout wide enough for the slowest render the flow tolerates.

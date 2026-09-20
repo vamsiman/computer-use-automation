@@ -49,6 +49,12 @@ SETTLE_MS = 2500
 #: asserts after each step, which waits and retries on its own budget.
 SETTLE_GRACE_MS = 120
 
+#: How many times to re-read the page before calling the surface broken. The
+#: main document is unreadable for a moment during a navigation, and on a slow
+#: render that moment is long enough to be caught.
+OBSERVE_ATTEMPTS = 4
+OBSERVE_RETRY_MS = 250
+
 
 def headless_default() -> bool:
     return os.environ.get("CUA_HEADLESS", "").lower() in ("1", "true", "yes")
@@ -72,7 +78,23 @@ class WebSurface:
     # --- observation -----------------------------------------------------
 
     def observe(self, screenshot: bool = False) -> Snapshot:
-        """Build one tree spanning every frame on the page."""
+        """Build one tree spanning every frame on the page.
+
+        Retried a few times before giving up. The main document can be
+        momentarily unreadable while the browser is between pages -- which on
+        a slow legacy render is not a broken browser, it is a browser waiting,
+        and treating it as a surface error turns a transient stall into a hard
+        failure that the recovery machinery never gets to see.
+        """
+        for attempt in range(OBSERVE_ATTEMPTS):
+            snapshot = self._observe_once(screenshot)
+            if snapshot is not None:
+                return snapshot
+            if attempt < OBSERVE_ATTEMPTS - 1:
+                time.sleep(OBSERVE_RETRY_MS / 1000)
+        raise SurfaceError("could not read the main frame")
+
+    def _observe_once(self, screenshot: bool = False) -> Snapshot | None:
         self._frames = list(self.page.frames)
         trees: dict[int, A11yNode] = {}
         location = self.page.url
@@ -96,7 +118,7 @@ class WebSurface:
 
         root = trees.get(0)
         if root is None:
-            raise SurfaceError("could not read the main frame")
+            return None
 
         for index, frame in enumerate(self._frames):
             if index == 0 or index not in trees:

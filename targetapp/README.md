@@ -87,7 +87,7 @@ cue.
 | `99999` | "No records found." | business outcome — `MEMBER_NOT_FOUND` |
 | `10003` | "You are not authorized to view this member." | business outcome — `PERMISSION_DENIED` |
 | `10004` | `System Notice` interstitial before the detail | **recoverable** — dismiss via `Continue` |
-| `GET /debug/slow?ms=8000` | One-shot stall on the next render | **recoverable** — retry with backoff |
+| `GET /debug/slow?ms=8000[&path=/members/10001]` | One-shot stall on the next render, optionally only for that path | **recoverable** — absorbed by the checkpoint's bounded wait |
 | `GET /debug/expire` | Session dropped; sign-in renders *in the frame* | **recoverable** — re-authenticate and resume |
 | `10005` | `Compliance Hold`, single `Acknowledge` button | **undeclared** — escalate to a human |
 | `10006` | Member visible, but no savings row to read | hard failure — extract target absent |

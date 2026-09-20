@@ -186,9 +186,15 @@ recoveries:
     max_occurrences: 1
     resume_from: s1
 
+  # Recoveries are only consulted once a checkpoint has failed to hold, which
+  # is what lets this detector be so plain: if the submit went through and we
+  # are still looking at the search screen, the next page has not arrived yet.
+  # A slow render has nothing of its own to detect -- the symptom is the
+  # absence of what we were waiting for -- so the signal is the screen we have
+  # not left.
   - code: SLOW_LOAD
     detect:
-      primary: {strategy: role_name, role: heading, name_contains: Member}
+      primary: {strategy: role_name, role: heading, name: Member Search}
     strategy: retry_with_backoff
     max_occurrences: 3
     backoff_ms: 750

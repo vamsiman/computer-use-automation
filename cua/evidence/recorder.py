@@ -25,7 +25,7 @@ import json
 import os
 import time
 from contextlib import contextmanager
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field, is_dataclass
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
@@ -62,6 +62,12 @@ def jsonable(value: Any) -> Any:
         return value.isoformat()
     if isinstance(value, Path):
         return str(value)
+    if is_dataclass(value) and not isinstance(value, type):
+        # The replay results are frozen dataclasses. Without this they fall
+        # through to str() and the whole typed result lands in result.json as
+        # one unparseable repr -- and, worse, the redactor can no longer see
+        # the fields it is supposed to be classifying by name.
+        return jsonable(asdict(value))
     if hasattr(value, "model_dump"):
         return jsonable(value.model_dump(mode="json", exclude_none=True))
     if isinstance(value, Mapping):

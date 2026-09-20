@@ -78,8 +78,16 @@ class Session:
     #: nothing while it waits.
     _resume: threading.Event = field(default_factory=threading.Event, repr=False)
     _lock: threading.RLock = field(default_factory=threading.RLock, repr=False)
+    _guarded: "GuardedSurface | None" = field(default=None, repr=False)
 
     # --- control ---------------------------------------------------------
+
+    @property
+    def controlled(self) -> "GuardedSurface":
+        """The surface to hand to an engine: refuses to act out of turn."""
+        if self._guarded is None:
+            self._guarded = GuardedSurface(self, self.surface)
+        return self._guarded
 
     @property
     def control(self) -> ControlOwner:
@@ -167,6 +175,53 @@ class Session:
         is about to drop anyway.
         """
         self.browser.stop()
+
+
+@dataclass
+class GuardedSurface:
+    """The session's surface with the control token actually enforced.
+
+    Without this the token is documentation. ``assert_control`` has to be
+    called by something, and "every caller remembers to call it" is exactly
+    the kind of rule that holds until the one path that forgets. Wrapping the
+    surface makes acting while a human holds the session impossible rather
+    than discouraged, which is what the brief's "a way to know who is (or
+    should be) in control" is worth having.
+
+    Only ``act`` is guarded. Observing and resolving are read-only, and the
+    operator console wants to look at the page precisely while a person is
+    driving it -- a guard there would block the one view that matters during a
+    handoff.
+    """
+
+    session: "Session"
+    inner: Surface
+
+    def observe(self, *args, **kwargs):
+        return self.inner.observe(*args, **kwargs)
+
+    def resolve(self, *args, **kwargs):
+        return self.inner.resolve(*args, **kwargs)
+
+    def act(self, action):
+        self.session.assert_control(ControlOwner.AUTOMATION)
+        return self.inner.act(action)
+
+    def screenshot(self, *args, **kwargs):
+        return self.inner.screenshot(*args, **kwargs)
+
+    def close(self) -> None:
+        self.inner.close()
+
+    def __getattr__(self, name: str):
+        # Everything a particular surface offers beyond the protocol --
+        # page_source, the human-action watcher -- passes straight through, so
+        # wrapping a surface never costs it a capability.
+        if name.startswith("_") or name == "inner":
+            # Guard against recursing forever when `inner` itself is missing,
+            # which is what a dunder probe during copy or pickle looks like.
+            raise AttributeError(name)
+        return getattr(self.inner, name)
 
 
 class SessionManager:

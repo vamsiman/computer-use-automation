@@ -13,6 +13,7 @@ honest way to do that is to leave the window on screen and stop driving it.
 from __future__ import annotations
 
 import os
+import re
 import threading
 import time
 from pathlib import Path
@@ -27,7 +28,25 @@ from cua.surface.base import SurfaceError
 from cua.surface.resolve import resolve_in_tree
 from cua.types import ActionType
 
-_SCRIPT = (Path(__file__).with_name("inject.js")).read_text(encoding="utf-8")
+#: Textual includes, because these scripts run inside ``frame.evaluate`` where
+#: there is no module system to import with. One line, and it lets the
+#: observer and the human-action watcher share a single definition of what a
+#: control is called.
+_INCLUDE = re.compile(r"^[ 	]*// @include (\S+)$", re.M)
+
+
+def _script(name: str) -> str:
+    def expand(match: "re.Match[str]") -> str:
+        return (Path(__file__).with_name(match.group(1))).read_text(encoding="utf-8")
+
+    text = (Path(__file__).with_name(name)).read_text(encoding="utf-8")
+    return _INCLUDE.sub(expand, text)
+
+
+_SCRIPT = _script("inject.js")
+
+#: Injected only while a person holds the session. See ``watch.js``.
+_WATCH_SCRIPT = _script("watch.js")
 
 #: How long to let a navigation settle before carrying on regardless. Short on
 #: purpose: a page that is still loading is a condition the replay engine's
@@ -74,6 +93,7 @@ class WebSurface:
         self.screenshot_dir = Path(screenshot_dir) if screenshot_dir else None
         self._frames: list[Frame] = []
         self._shot_seq = 0
+        self._watch_installed = False
 
     # --- observation -----------------------------------------------------
 
@@ -304,6 +324,48 @@ class WebSurface:
                 # failing an evidence capture over.
                 continue
         return "\n\n".join(parts)
+
+    # --- watching a person -----------------------------------------------
+
+    def watch_start(self) -> None:
+        """Begin recording what a human does in this window.
+
+        Two injections on purpose. ``add_init_script`` covers every document
+        created from here on, which is what keeps the watch alive through the
+        navigations the person causes; evaluating it directly covers the
+        documents that are already open, which an init script never reaches.
+        Both are idempotent.
+        """
+        if not self._watch_installed:
+            self.page.add_init_script(_WATCH_SCRIPT)
+            self._watch_installed = True
+        self._watch("start")
+
+    def watch_drain(self) -> list[dict]:
+        """Take everything recorded so far and clear it."""
+        return self._watch("drain")
+
+    def watch_stop(self) -> list[dict]:
+        records = self._watch("drain")
+        self._watch("stop")
+        return records
+
+    def _watch(self, method: str) -> list[dict]:
+        records: list[dict] = []
+        for frame in self.page.frames:
+            try:
+                # Frames loaded before the init script existed need the script
+                # itself; the guard inside it makes a second evaluation free.
+                frame.evaluate(_WATCH_SCRIPT)
+                result = frame.evaluate(f"() => window.__cuaWatch.{method}()")
+            except Exception:
+                # A frame that detached mid-handoff is not worth failing over.
+                # Its records are in the tab's storage and the next frame
+                # reads the same storage.
+                continue
+            if isinstance(result, list):
+                records.extend(result)
+        return records
 
     def close(self) -> None:
         try:

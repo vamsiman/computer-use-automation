@@ -142,8 +142,15 @@ class _StepOutcome:
 
 
 #: Called when something undeclared blocks the run. Returns True if a person
-#: dealt with it and the engine should re-verify and continue. Issue 13 wires
-#: this to the live session handoff; without one, the run stops and says so.
+#: dealt with it and the engine should re-verify and continue. Without one,
+#: the run stops and says so.
+#:
+#: A handler may also offer ``resolved(verified: bool)``, which the engine
+#: calls with the result of re-checking the step afterwards. That is how the
+#: live handoff learns whether to put its session back into RUNNING or ask for
+#: a person again: the engine knows whether the checkpoint held, and is the
+#: only thing that can know, but it has no business knowing a session exists.
+#: Optional, so a plain function remains a perfectly good handler.
 EscalationHandler = Callable[[Step, str, Snapshot], bool]
 
 #: Called by the SESSION_EXPIRED recovery. Kept as a callable so replay never
@@ -552,7 +559,11 @@ class ReplayEngine:
     ) -> Result | None:
         if self.escalate is not None and self.escalate(step, reason, snapshot):
             # A person dealt with it. Never take their word for it: re-verify.
-            if self._verify(step.checkpoint):
+            verified = self._verify(step.checkpoint)
+            notify = getattr(self.escalate, "resolved", None)
+            if callable(notify):
+                notify(verified)
+            if verified:
                 return None
             reason = f"{reason} (and the step still did not verify afterwards)"
 
@@ -562,6 +573,7 @@ class ReplayEngine:
             )
         return Escalated(
             capability=self.artifact.ref,
+            intervention_id=self._intervention_id(),
             step_id=step.id,
             intent=step.intent,
             reason=reason,
@@ -569,6 +581,16 @@ class ReplayEngine:
             session_id=self.session_id,
             partial_outputs=dict(self.outputs),
         )
+
+    def _intervention_id(self) -> str | None:
+        """Name the open intervention, if the handler kept one.
+
+        The caller of a replay that came back ``Escalated`` needs to be able
+        to find the thing a person is being asked about, and the handler is
+        the only party that knows its id.
+        """
+        current = getattr(self.escalate, "current", None)
+        return getattr(current, "id", None)
 
     def _failure(
         self,

@@ -43,7 +43,7 @@ Working agreement: one issue per session. On completion, write a handoff to
 | 10 | Distillation: trace to artifact | #11 | 5, 9 | done |
 | 11 | Replay engine and result contract | #12 | 5, 6, 7, 8 | done |
 | 12 | Error taxonomy: outcomes, recoveries, budgets | #13 | 3, 11 | done |
-| 13 | Escalation, handoff, human action capture | #14 | 6, 11, 12 | todo |
+| 13 | Escalation, handoff, human action capture | #14 | 6, 11, 12 | done |
 | 14 | Operator console | #15 | 13 | todo |
 | 15 | CLI and capability catalog | #16 | 10, 11, 14 | todo |
 | 16 | Tenant variant and artifact overrides | #17 | 11, 15 | todo |

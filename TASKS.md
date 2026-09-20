@@ -39,7 +39,7 @@ Working agreement: one issue per session. On completion, write a handoff to
 | 6 | Session manager, control token, auth bootstrap | #7 | 1, 4 | done |
 | 7 | Policy engine: allowlist and risk gating | #8 | 1, 5 | done |
 | 8 | Evidence recorder and declarative redaction | #9 | 1, 5 | done |
-| 9 | Discovery engine: LLM observe/decide/act loop | #10 | 4, 5, 6, 7, 8 | todo |
+| 9 | Discovery engine: LLM observe/decide/act loop | #10 | 4, 5, 6, 7, 8 | done |
 | 10 | Distillation: trace to artifact | #11 | 5, 9 | todo |
 | 11 | Replay engine and result contract | #12 | 5, 6, 7, 8 | todo |
 | 12 | Error taxonomy: outcomes, recoveries, budgets | #13 | 3, 11 | todo |

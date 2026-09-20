@@ -1,0 +1,46 @@
+{# The application shell.
+
+   Everything the operator actually works in lives inside <iframe name="mainFrame">.
+   A driver that reads only the top-level document sees a nav menu and nothing
+   else, which is why the surface layer has to walk frames and merge them into
+   one tree. #}
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>{{ tenant.short_name }} - {{ tenant.product }}</title>
+<link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='legacy.css') }}">
+</head>
+<body class="shell">
+<table width="100%" cellspacing="0" cellpadding="0" border="0" class="shellwrap">
+<tr>
+  <td colspan="2" class="brandbar">
+    <table width="100%" cellspacing="0" cellpadding="0" border="0">
+    <tr>
+      <td><span class="brandname">{{ tenant.institution }}</span></td>
+      <td align="right" class="sessioninfo">
+        Signed in as {{ user }} &nbsp;|&nbsp;
+        <a href="/logout" id="ctl00_lnkSignOut">Sign Out</a>
+      </td>
+    </tr>
+    </table>
+  </td>
+</tr>
+<tr>
+  <td class="navcol" valign="top" width="150">
+    <table width="100%" cellspacing="0" cellpadding="0" border="0">
+    <tr><td class="navhdr">Servicing</td></tr>
+    <tr><td class="navitem"><a href="/members/search" target="mainFrame" id="ctl00_navMemberSearch">Member Search</a></td></tr>
+    <tr><td class="navitem"><a href="/members/search" target="mainFrame" id="ctl00_navAccounts">Accounts</a></td></tr>
+    <tr><td class="navhdr">Administration</td></tr>
+    <tr><td class="navitem"><a href="/members/search" target="mainFrame" id="ctl00_navReports">Reports</a></td></tr>
+    </table>
+  </td>
+  <td valign="top" class="framecell">
+    <iframe name="mainFrame" id="ctl00_mainFrame" src="/members/search"
+            frameborder="0" scrolling="auto" width="100%" height="600"></iframe>
+  </td>
+</tr>
+</table>
+</body>
+</html>

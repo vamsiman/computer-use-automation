@@ -1,0 +1,35 @@
+{# Base for every page rendered inside the content frame.
+
+   The page title is a real <h2>, which gives it an accessible heading with a
+   usable name. That is deliberate: checkpoints need something stable to assert
+   on, and a surface where nothing at all resolves semantically would be a
+   strawman rather than a hard case. Everything below the title is table soup. #}
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>{{ tenant.short_name }} - {% block title %}{% endblock %}</title>
+<link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='legacy.css') }}">
+<script type="text/javascript" src="{{ url_for('static', filename='postback.js') }}"></script>
+</head>
+<body class="framed">
+<table width="100%" cellspacing="0" cellpadding="0" border="0" class="pagewrap">
+<tr>
+  <td class="pagehdr">
+    <table width="100%" cellspacing="0" cellpadding="0" border="0">
+    <tr>
+      <td><h2 class="pagetitle">{% block heading %}{% endblock %}</h2></td>
+      <td align="right" class="crumb">{% block crumb %}{% endblock %}</td>
+    </tr>
+    </table>
+  </td>
+</tr>
+<tr><td class="spacer" height="6">&nbsp;</td></tr>
+<tr>
+  <td class="pagebody">
+    {% block body %}{% endblock %}
+  </td>
+</tr>
+</table>
+</body>
+</html>

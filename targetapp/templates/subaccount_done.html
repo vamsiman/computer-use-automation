@@ -1,0 +1,39 @@
+{% extends "_layout.html" %}
+{% block title %}Sub-Account Opened{% endblock %}
+{% block heading %}Sub-Account Opened{% endblock %}
+{% block crumb %}
+<a href="javascript:__doPostBack('ctl00$ContentPlaceHolder1$lnkBackToMember','{{ member.member_no }}')"
+   id="ctl00_ContentPlaceHolder1_lnkBackToMember">Back to Member</a>
+{% endblock %}
+
+{% block body %}
+{# The checkpoint for the write capability, and the screen its declared output
+   is extracted from. #}
+<table class="confirmbox" cellspacing="0" cellpadding="8" border="0" width="480">
+<tr>
+  <td>
+    <span class="okmsg">Account opened successfully.</span>
+    <table class="info" cellspacing="0" cellpadding="3" border="0" width="100%">
+    <tr>
+      <td class="lblcell" width="140"><span class="lbl">New Account No.:</span></td>
+      <td class="valcell">
+        <span id="ctl00_ContentPlaceHolder1_lblNewAcctNo">{{ acct_number }}</span>
+      </td>
+    </tr>
+    <tr>
+      <td class="lblcell"><span class="lbl">Account Type:</span></td>
+      <td class="valcell"><span id="ctl00_ContentPlaceHolder1_lblNewAcctType">{{ acct_type }}</span></td>
+    </tr>
+    <tr>
+      <td class="lblcell"><span class="lbl">Opening Balance:</span></td>
+      <td class="valcell"><span id="ctl00_ContentPlaceHolder1_lblNewAcctBal">{{ money(cents) }}</span></td>
+    </tr>
+    <tr>
+      <td class="lblcell"><span class="lbl">Member:</span></td>
+      <td class="valcell">{{ member.member_no }} - {{ member.first }} {{ member.last }}</td>
+    </tr>
+    </table>
+  </td>
+</tr>
+</table>
+{% endblock %}

@@ -1,0 +1,88 @@
+{% extends "_layout.html" %}
+{% block title %}Open Sub-Account{% endblock %}
+{% block heading %}Open Sub-Account{% endblock %}
+{% block crumb %}
+<a href="javascript:__doPostBack('ctl00$ContentPlaceHolder1$lnkBackToMember','{{ member.member_no }}')"
+   id="ctl00_ContentPlaceHolder1_lnkBackToMember">Back to Member</a>
+{% endblock %}
+
+{% block body %}
+<table class="info" cellspacing="0" cellpadding="3" border="0">
+<tr>
+  <td class="lblcell"><span class="lbl">Member:</span></td>
+  <td class="valcell">
+    <span id="ctl00_ContentPlaceHolder1_lblMemberSummary">{{ member.member_no }} - {{ member.first }} {{ member.last }}</span>
+  </td>
+</tr>
+</table>
+
+{% if message %}
+<table class="msgbox" cellspacing="0" cellpadding="0" border="0">
+<tr>
+  <td class="msgicon">!</td>
+  <td><span id="ctl00_ContentPlaceHolder1_lblFormError" class="msgtext" role="alert">{{ message }}</span></td>
+</tr>
+</table>
+{% endif %}
+
+{# Four fields. Three have bare <span> pseudo-labels; "Initial Deposit" has a
+   real <label for>, so it is the one control on this form that role+name can
+   find. That contrast is deliberate -- it is what a mixed-vintage enterprise
+   form actually looks like, and it puts two locator tiers side by side in one
+   screen. #}
+<form method="post" action="/members/{{ member.member_no }}/subaccount/review" id="aspnetForm">
+<table class="frm" cellspacing="0" cellpadding="4" border="0">
+<tr>
+  <td class="lblcell" width="128"><span class="lbl">Account Type:</span></td>
+  <td class="spacer" width="6">&nbsp;</td>
+  <td>
+    <select name="acct_type" id="ctl00_ContentPlaceHolder1_ddlAcctType" class="fld">
+      <option value="">-- Select --</option>
+      {% for t in acct_types %}
+      <option value="{{ t }}"{% if form.get('acct_type') == t %} selected{% endif %}>{{ t }}</option>
+      {% endfor %}
+    </select>
+  </td>
+</tr>
+<tr>
+  <td class="lblcell">
+    <label for="ctl00_ContentPlaceHolder1_txtDeposit" class="lbl">Initial Deposit</label>
+  </td>
+  <td class="spacer">&nbsp;</td>
+  <td>
+    <input type="text" name="deposit" id="ctl00_ContentPlaceHolder1_txtDeposit"
+           class="fld" size="14" value="{{ form.get('deposit', '') }}">
+    <span class="hint">minimum 25.00</span>
+  </td>
+</tr>
+<tr>
+  <td class="lblcell"><span class="lbl">Purpose:</span></td>
+  <td class="spacer">&nbsp;</td>
+  <td>
+    <input type="text" name="purpose" id="ctl00_ContentPlaceHolder1_txtPurpose"
+           class="fld" size="34" maxlength="60" value="{{ form.get('purpose', '') }}">
+  </td>
+</tr>
+<tr>
+  <td class="lblcell"><span class="lbl">Statement Pref:</span></td>
+  <td class="spacer">&nbsp;</td>
+  <td>
+    <select name="stmt_pref" id="ctl00_ContentPlaceHolder1_ddlStmtPref" class="fld">
+      <option value="">-- Select --</option>
+      {% for p in stmt_prefs %}
+      <option value="{{ p }}"{% if form.get('stmt_pref') == p %} selected{% endif %}>{{ p }}</option>
+      {% endfor %}
+    </select>
+  </td>
+</tr>
+<tr>
+  <td>&nbsp;</td>
+  <td>&nbsp;</td>
+  <td>
+    <input type="submit" value="Review" name="ctl00$ContentPlaceHolder1$btnReview"
+           id="ctl00_ContentPlaceHolder1_btnReview" class="btn btnprimary">
+  </td>
+</tr>
+</table>
+</form>
+{% endblock %}

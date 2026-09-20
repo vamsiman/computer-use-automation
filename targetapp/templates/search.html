@@ -1,0 +1,47 @@
+{% extends "_layout.html" %}
+{% block title %}Member Search{% endblock %}
+{% block heading %}Member Search{% endblock %}
+
+{% block body %}
+{% if message %}
+<table class="msgbox" cellspacing="0" cellpadding="0" border="0">
+<tr>
+  <td class="msgicon">!</td>
+  <td><span id="ctl00_ContentPlaceHolder1_lblMessage" class="msgtext" role="alert">{{ message }}</span></td>
+</tr>
+</table>
+{% endif %}
+
+{# The member-id field is the hard one on purpose.
+
+   Its label is a bare <span> in an adjacent cell -- no <label for>, no
+   aria-label, no title, no placeholder. Its accessible name is therefore
+   empty, so role+name targeting cannot find it and the locator chain has to
+   fall through to reasoning about the label sitting to its left. Exactly the
+   situation the accessibility tree does not solve for you.
+
+   The Search button next to it is an ordinary submit input, so its value
+   supplies a real accessible name and role+name works. Same form, two tiers. #}
+<form method="post" action="/members/search" id="aspnetForm">
+<table class="frm" cellspacing="0" cellpadding="4" border="0">
+<tr>
+  <td class="lblcell" width="96"><span class="lbl">{{ tenant.member_label }}</span></td>
+  <td class="spacer" width="6">&nbsp;</td>
+  <td>
+    <input type="text" name="mbr" id="ctl00_ContentPlaceHolder1_txtMbrId"
+           class="fld" size="14" maxlength="5" value="{{ entered }}">
+  </td>
+  <td class="spacer" width="8">&nbsp;</td>
+  <td>
+    <input type="submit" value="Search" name="ctl00$ContentPlaceHolder1$btnSearch"
+           id="ctl00_ContentPlaceHolder1_btnSearch" class="btn btnprimary">
+  </td>
+</tr>
+<tr>
+  <td>&nbsp;</td>
+  <td>&nbsp;</td>
+  <td colspan="3" class="hint">{{ tenant.member_field_note }}</td>
+</tr>
+</table>
+</form>
+{% endblock %}

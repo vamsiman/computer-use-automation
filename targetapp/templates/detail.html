@@ -1,0 +1,66 @@
+{% extends "_layout.html" %}
+{% block title %}Member Details{% endblock %}
+{% block heading %}Member Details{% endblock %}
+{% block crumb %}
+<a href="javascript:__doPostBack('ctl00$ContentPlaceHolder1$lnkBackToSearch','')"
+   id="ctl00_ContentPlaceHolder1_lnkBackToSearch">Back to Search</a>
+{% endblock %}
+
+{% block body %}
+<table class="info" cellspacing="0" cellpadding="3" border="0">
+<tr>
+  <td class="lblcell"><span class="lbl">Member No.:</span></td>
+  <td class="valcell"><span id="ctl00_ContentPlaceHolder1_lblMbrNo">{{ member.member_no }}</span></td>
+  <td class="spacer" width="28">&nbsp;</td>
+  <td class="lblcell"><span class="lbl">Name:</span></td>
+  <td class="valcell"><span id="ctl00_ContentPlaceHolder1_lblName">{{ member.first }} {{ member.last }}</span></td>
+</tr>
+<tr>
+  <td class="lblcell"><span class="lbl">Status:</span></td>
+  <td class="valcell"><span id="ctl00_ContentPlaceHolder1_lblStatus">{{ member.status }}</span></td>
+  <td class="spacer">&nbsp;</td>
+  <td class="lblcell"><span class="lbl">Branch:</span></td>
+  <td class="valcell"><span id="ctl00_ContentPlaceHolder1_lblBranch">{{ member.branch }}</span></td>
+</tr>
+</table>
+
+{# The accounts grid has no <th> anywhere: the header row is ordinary <td>s
+   with a class on them. There is no column semantics to read, so "the balance
+   on the savings row" cannot be expressed as role+name and has to be resolved
+   structurally -- match the row by its text, then take the cell under the
+   column whose header text matches.
+
+   Rows are rendered from the tenant's column list rather than a fixed
+   template, so a tenant that reorders its columns is a config change here and
+   a genuine targeting problem for the automation. #}
+<table class="grid" id="ctl00_ContentPlaceHolder1_grdAccounts"
+       cellspacing="0" cellpadding="4" border="0">
+<tr class="gridhdr">
+  {% for column in tenant.accounts_columns %}
+  <td class="gridhdrcell">{{ column }}</td>
+  {% endfor %}
+</tr>
+{% for account in accounts %}
+<tr class="{{ 'gridrow' if loop.index0 % 2 == 0 else 'gridrowalt' }}">
+  {% for column in tenant.accounts_columns %}
+  <td{% if column == 'Balance' %} align="right"{% endif %}>{{ acct_cell(account, column) }}</td>
+  {% endfor %}
+</tr>
+{% endfor %}
+{% if not accounts %}
+<tr class="gridrow">
+  <td colspan="{{ tenant.accounts_columns|length }}">No accounts on file.</td>
+</tr>
+{% endif %}
+</table>
+
+{# A javascript: anchor, not a URL. The automation has to click it. #}
+<table class="actions" cellspacing="0" cellpadding="0" border="0">
+<tr>
+  <td>
+    <a class="actionlink" id="ctl00_ContentPlaceHolder1_lnkNewSub"
+       href="javascript:__doPostBack('ctl00$ContentPlaceHolder1$lnkNewSub','{{ member.member_no }}')">Open Sub-Account</a>
+  </td>
+</tr>
+</table>
+{% endblock %}

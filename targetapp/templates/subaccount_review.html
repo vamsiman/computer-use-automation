@@ -1,0 +1,61 @@
+{% extends "_layout.html" %}
+{% block title %}Confirm Sub-Account{% endblock %}
+{% block heading %}Confirm Sub-Account{% endblock %}
+
+{% block body %}
+{# The gate before the irreversible write. Nothing has been created yet; the
+   Confirm button below is the point of no return, and is the step the policy
+   engine has to classify as irreversible and refuse to take unattended. #}
+<table class="confirmbox" cellspacing="0" cellpadding="8" border="0" width="480">
+<tr>
+  <td>
+    <span class="warn">Review before confirming.</span>
+    <table class="info" cellspacing="0" cellpadding="3" border="0" width="100%">
+    <tr>
+      <td class="lblcell" width="140"><span class="lbl">Member:</span></td>
+      <td class="valcell">{{ member.member_no }} - {{ member.first }} {{ member.last }}</td>
+    </tr>
+    <tr>
+      <td class="lblcell"><span class="lbl">Account Type:</span></td>
+      <td class="valcell"><span id="ctl00_ContentPlaceHolder1_lblCfmType">{{ form.acct_type }}</span></td>
+    </tr>
+    <tr>
+      <td class="lblcell"><span class="lbl">Initial Deposit:</span></td>
+      <td class="valcell"><span id="ctl00_ContentPlaceHolder1_lblCfmDeposit">{{ money(cents) }}</span></td>
+    </tr>
+    <tr>
+      <td class="lblcell"><span class="lbl">Purpose:</span></td>
+      <td class="valcell"><span id="ctl00_ContentPlaceHolder1_lblCfmPurpose">{{ form.purpose }}</span></td>
+    </tr>
+    <tr>
+      <td class="lblcell"><span class="lbl">Statement Pref:</span></td>
+      <td class="valcell"><span id="ctl00_ContentPlaceHolder1_lblCfmStmt">{{ form.stmt_pref }}</span></td>
+    </tr>
+    </table>
+  </td>
+</tr>
+</table>
+
+<table cellspacing="0" cellpadding="4" border="0" style="margin-top:10px">
+<tr>
+  <td>
+    <form method="post" action="/members/{{ member.member_no }}/subaccount/commit" id="aspnetForm">
+      <input type="hidden" name="acct_type" value="{{ form.acct_type }}">
+      <input type="hidden" name="deposit" value="{{ form.deposit }}">
+      <input type="hidden" name="purpose" value="{{ form.purpose }}">
+      <input type="hidden" name="stmt_pref" value="{{ form.stmt_pref }}">
+      <input type="submit" value="Confirm" name="ctl00$ContentPlaceHolder1$btnConfirm"
+             id="ctl00_ContentPlaceHolder1_btnConfirm" class="btn btnprimary">
+    </form>
+  </td>
+  <td>
+    <form method="post" action="/members/{{ member.member_no }}/subaccount/review">
+      <input type="hidden" name="acct_type" value="{{ form.acct_type }}">
+      <input type="hidden" name="deposit" value="">
+      <input type="submit" value="Back" name="ctl00$ContentPlaceHolder1$btnBack"
+             id="ctl00_ContentPlaceHolder1_btnBack" class="btn">
+    </form>
+  </td>
+</tr>
+</table>
+{% endblock %}

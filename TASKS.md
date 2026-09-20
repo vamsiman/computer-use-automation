@@ -32,7 +32,7 @@ Working agreement: one issue per session. On completion, write a handoff to
 | # | Title | GitHub | Depends on | Status |
 |---|---|---|---|---|
 | 1 | Repo scaffold and core types | #2 | — | done |
-| 2 | Target app: screens, data, hostile markup | #3 | 1 | todo |
+| 2 | Target app: screens, data, hostile markup | #3 | 1 | done |
 | 3 | Target app: failure modes and triggers | #4 | 2 | todo |
 | 4 | Surface abstraction, WebSurface, locator engine | #5 | 1, 2 | todo |
 | 5 | Artifact schema, store, validator | #6 | 1, 4 | todo |

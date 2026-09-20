@@ -1,0 +1,144 @@
+/* Styling for the stand-in console.
+   Period-appropriate: small fonts, hard borders, table gridlines, no layout
+   primitives newer than about 2004. */
+
+body {
+    font-family: Verdana, Tahoma, Arial, sans-serif;
+    font-size: 11px;
+    color: #222;
+    background: #ffffff;
+    margin: 0;
+    padding: 0;
+}
+
+body.shell { background: #e8ebef; }
+body.signinpage { background: #dfe4ea; }
+body.framed { background: #ffffff; padding: 10px; }
+
+a { color: #10467a; }
+
+/* ---- chrome ------------------------------------------------------------ */
+
+.brandbar {
+    background: #1f4e79;
+    color: #ffffff;
+    padding: 7px 10px;
+    border-bottom: 2px solid #143654;
+}
+
+.brandname { font-size: 13px; font-weight: bold; letter-spacing: .2px; }
+.sessioninfo { color: #cfe0f0; font-size: 10px; }
+.sessioninfo a { color: #ffffff; }
+
+.navcol {
+    background: #f1f3f6;
+    border-right: 1px solid #b9c2cc;
+    width: 150px;
+}
+
+.navhdr {
+    background: #d7dde4;
+    border-bottom: 1px solid #b9c2cc;
+    padding: 4px 8px;
+    font-weight: bold;
+    font-size: 10px;
+    text-transform: uppercase;
+    color: #44516045;
+    color: #445160;
+}
+
+.navitem { padding: 3px 8px; border-bottom: 1px solid #e3e7ec; }
+.navitem a { text-decoration: none; }
+.navitem a:hover { text-decoration: underline; }
+
+.framecell { background: #ffffff; }
+iframe { border: 0; display: block; }
+
+/* ---- page ------------------------------------------------------------- */
+
+.pagehdr { border-bottom: 1px solid #b9c2cc; padding-bottom: 3px; }
+
+h2.pagetitle {
+    font-size: 13px;
+    color: #1f4e79;
+    margin: 0;
+    padding: 0;
+    font-weight: bold;
+}
+
+.crumb { font-size: 10px; }
+.spacer { font-size: 1px; line-height: 1px; }
+.hint { color: #6b7684; font-size: 10px; padding-top: 3px; }
+
+/* ---- forms ------------------------------------------------------------ */
+
+.lbl { font-weight: bold; color: #3a4552; }
+.lblcell { text-align: right; white-space: nowrap; }
+.valcell { color: #111; }
+
+input.fld, select.fld {
+    font-family: Verdana, Tahoma, sans-serif;
+    font-size: 11px;
+    border: 1px solid #7f8c99;
+    background: #ffffff;
+    padding: 2px 3px;
+}
+
+input.btn {
+    font-family: Verdana, Tahoma, sans-serif;
+    font-size: 11px;
+    border: 1px solid #7f8c99;
+    background: #e4e8ed;
+    padding: 2px 10px;
+    cursor: pointer;
+}
+
+input.btnprimary { background: #1f4e79; color: #ffffff; border-color: #143654; }
+
+.frm { margin-top: 10px; }
+.info { margin-top: 8px; margin-bottom: 14px; }
+
+/* ---- messages --------------------------------------------------------- */
+
+.msgbox {
+    background: #fff6d9;
+    border: 1px solid #d9b441;
+    margin: 8px 0;
+}
+
+.msgicon {
+    background: #d9b441;
+    color: #ffffff;
+    font-weight: bold;
+    width: 18px;
+    text-align: center;
+}
+
+.msgtext { padding: 4px 8px; display: inline-block; color: #6b5310; }
+
+/* ---- grid ------------------------------------------------------------- */
+
+.grid { border: 1px solid #99a5b1; border-collapse: collapse; }
+.grid td { border: 1px solid #ccd3da; }
+
+.gridhdrcell {
+    background: #d7dde4;
+    font-weight: bold;
+    color: #33414f;
+    border-bottom: 1px solid #99a5b1 !important;
+}
+
+.gridrow { background: #ffffff; }
+.gridrowalt { background: #f5f7f9; }
+
+.actions { margin-top: 14px; }
+.actionlink { font-weight: bold; }
+
+.confirmbox {
+    border: 1px solid #99a5b1;
+    background: #f5f7f9;
+    margin-top: 10px;
+}
+
+.warn { color: #8a2b2b; font-weight: bold; }
+.okmsg { color: #1c6b2e; font-weight: bold; }

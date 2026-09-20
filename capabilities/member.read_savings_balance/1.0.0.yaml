@@ -1,0 +1,194 @@
+schema_version: '1.0'
+
+# Hand-authored reference artifact.
+#
+# Every locator below was verified against the live target app while building
+# the surface layer, so this is a working capability rather than an
+# illustration. It exists for two reasons: the replay engine needs something
+# real to run before discovery exists, and it is the worked example of what a
+# distilled artifact should look like.
+#
+# The discovery run produces the same shape with `status: draft` and a
+# populated `provenance`.
+
+capability:
+  id: member.read_savings_balance
+  version: 1.0.0
+  title: Read a member's savings balance
+  description: >-
+    Look up a member by their 5-digit member number and return their name and
+    current savings balance. Read-only: makes no changes to any record.
+    Returns MEMBER_NOT_FOUND, VALIDATION_ERROR or PERMISSION_DENIED as
+    outcomes rather than errors.
+  app:
+    vendor: meridian
+    product: MemberConsole
+    version_range: '>=4.2 <5.0'
+  status: approved
+  provenance:
+    model: hand-authored
+    step_count_raw: 6
+    step_count_final: 6
+
+inputs:
+  member_id:
+    type: string
+    description: The member's 5-digit member number.
+    required: true
+    pattern: '^[0-9]{5}$'
+    sensitivity: internal
+
+outputs:
+  member_name:
+    type: string
+    description: The member's full name as shown on the detail screen.
+    sensitivity: pii
+  savings_balance:
+    type: money
+    description: Current balance of the member's savings account.
+    sensitivity: pii
+    currency: USD
+
+preconditions:
+  authenticated: true
+  entry_point: /members/search
+
+steps:
+  - id: s1
+    intent: Open the member search screen
+    action: navigate
+    args:
+      path: /members/search
+    risk: safe
+    checkpoint:
+      target:
+        primary: {strategy: role_name, role: heading, name: Member Search}
+      expect: visible
+      timeout_ms: 5000
+
+  # The field this step targets has no accessible name: its label is a bare
+  # <span> in the neighbouring table cell. Role+name is kept as the primary
+  # anyway, so that if the vendor ever labels the field properly we
+  # automatically resolve a tier better and the tier log says so.
+  - id: s2
+    intent: Enter the member number into the search field
+    action: type
+    target:
+      primary: {strategy: role_name, role: textbox, name: Member ID}
+      fallbacks:
+        - {strategy: label_proximity, label: 'Member ID:', direction: right}
+        - {strategy: region_path, region: 'form[0]', path: 'table[0]/row[0]/cell[2]/textbox[0]'}
+      confidence: 0.9
+      note: >-
+        Resolves at tier 1 in practice. The label is not programmatically
+        associated with the input, so tier 0 is aspirational.
+    args:
+      value: '{{ inputs.member_id }}'
+    risk: safe
+
+  - id: s3
+    intent: Submit the search
+    action: click
+    target:
+      primary: {strategy: role_name, role: button, name: Search}
+      fallbacks:
+        - {strategy: label_proximity, label: Search, direction: self}
+      confidence: 1.0
+    risk: safe
+    checkpoint:
+      target:
+        primary: {strategy: role_name, role: heading, name: Member Details}
+      expect: visible
+      timeout_ms: 8000
+
+  # Note the explicit `role: text`. By default the label rule looks for
+  # interactive controls, which is right when the next thing to do is click or
+  # type, and wrong when the next thing to do is read. Reading a value beside
+  # a label has to say so.
+  - id: s4
+    intent: Read the member's name from the detail header
+    action: extract
+    target:
+      primary: {strategy: label_proximity, label: 'Name:', direction: right, role: text}
+      fallbacks:
+        - {strategy: label_proximity, label: 'Name:', direction: right, role: cell}
+      confidence: 0.85
+    args:
+      into: member_name
+      transform: trim
+    risk: safe
+
+  # The accounts grid uses <td> for its header row, so there is no column
+  # semantics to read. This counts along from the heading text instead, which
+  # also survives a tenant reordering its columns.
+  - id: s5
+    intent: Read the savings balance from the accounts grid
+    action: extract
+    target:
+      primary: {strategy: row_cell, table: '', row_match: Savings, column: Balance}
+      fallbacks:
+        - {strategy: region_path, region: 'table[1]', path: 'row[1]/cell[2]'}
+      confidence: 0.9
+    args:
+      into: savings_balance
+      transform: money
+    risk: safe
+
+success:
+  checkpoint:
+    target:
+      primary: {strategy: role_name, role: heading, name: Member Details}
+    expect: visible
+    timeout_ms: 5000
+  require_outputs:
+    - member_name
+    - savings_balance
+
+# Legitimate answers about the world, not malfunctions. The caller branches on
+# these codes; conflating them with failures is the mistake this section
+# exists to prevent.
+outcomes:
+  - code: MEMBER_NOT_FOUND
+    detect:
+      primary: {strategy: role_name, role: alert, name_contains: No records found}
+    terminal: true
+    message: No member exists with that number.
+
+  - code: VALIDATION_ERROR
+    detect:
+      primary: {strategy: role_name, role: alert, name_contains: must be 5 digits}
+    terminal: true
+    message: The member number supplied is not in the expected format.
+
+  - code: PERMISSION_DENIED
+    detect:
+      primary: {strategy: role_name, role: alert, name_contains: not authorized}
+    terminal: true
+    message: This operator is not permitted to view that member.
+
+# Handled internally and never surfaced to the caller. Note that the
+# interstitial is matched by name, not merely by being a dialog: a compliance
+# hold renders through the identical template and must NOT be dismissed
+# automatically. That one is meant to escalate.
+recoveries:
+  - code: SYSTEM_NOTICE
+    detect:
+      primary: {strategy: role_name, role: dialog, name: System Notice}
+    strategy: dismiss
+    max_occurrences: 2
+    dismiss_via:
+      primary: {strategy: role_name, role: button, name: Continue}
+
+  - code: SESSION_EXPIRED
+    detect:
+      primary: {strategy: role_name, role: heading, name: Sign In}
+    strategy: reauthenticate_then_resume
+    max_occurrences: 1
+    resume_from: s1
+
+  - code: SLOW_LOAD
+    detect:
+      primary: {strategy: role_name, role: heading, name_contains: Member}
+    strategy: retry_with_backoff
+    max_occurrences: 3
+    backoff_ms: 750

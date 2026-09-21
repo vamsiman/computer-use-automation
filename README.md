@@ -51,13 +51,20 @@ playwright install chromium
 ```
 
 Only **discovery** needs an API key. Everything else — replay, the error
-taxonomy, the handoff, the console, the whole test suite — runs offline.
+taxonomy, the handoff, the console, the whole test suite — runs offline, so
+you can skip this entirely and still run every demo below except step 1.
 
 ```bash
-export ANTHROPIC_API_KEY=sk-ant-...     # discovery only
-export CUA_APP_USER=teller1             # optional; these are the defaults
-export CUA_APP_PASS=demo-pass-2024
+cp .env.example .env        # then put YOUR OWN key in it
 ```
+
+```bash
+# or set it in the environment directly
+export ANTHROPIC_API_KEY=sk-ant-your-key-here   # discovery only
+```
+
+`.env` is gitignored. No key is committed to this repository and none ever
+should be.
 
 Those credentials are for the fake application in `targetapp/`. **There is no
 real data anywhere in this repository** — the members are invented, the

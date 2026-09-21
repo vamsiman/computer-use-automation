@@ -84,19 +84,7 @@ def validate_inputs(artifact: Artifact, inputs: dict[str, Any]) -> list[str]:
     problems: list[str] = []
 
     for name, spec in artifact.inputs.items():
-        if name not in inputs or inputs[name] is None:
-            if spec.required:
-                problems.append(f"required input {name!r} was not supplied")
-            continue
-        value = str(inputs[name])
-        if spec.pattern and not re.fullmatch(spec.pattern, value):
-            problems.append(
-                f"input {name!r} = {value!r} does not match {spec.pattern}"
-            )
-        if spec.enum and value not in spec.enum:
-            problems.append(
-                f"input {name!r} = {value!r} is not one of {spec.enum}"
-            )
+        problems.extend(spec.problems(name, inputs.get(name)))
 
     unknown = set(inputs) - set(artifact.inputs)
     for name in sorted(unknown):
@@ -526,6 +514,8 @@ class ReplayEngine:
                 ),
             )
         problems = validate_inputs(self.artifact, inputs)
+        if problems and self._ask_for_missing(inputs, problems):
+            problems = validate_inputs(self.artifact, inputs)
         if problems:
             return Failure(
                 capability=self.artifact.ref,
@@ -534,6 +524,47 @@ class ReplayEngine:
                 observed="; ".join(problems),
             )
         return None
+
+    def _ask_for_missing(
+        self, inputs: dict[str, Any], problems: list[str]
+    ) -> bool:
+        """A value nobody supplied is a question, not a fault.
+
+        Only when every problem is a *missing* required input, and only when
+        the escalation handler can ask somebody. An ill-typed value is a
+        different thing -- the caller believes they supplied it and they are
+        wrong, and asking a person to retype it hides a bug in whatever
+        called us.
+
+        The value comes back through the capability's own ``InputSpec``, so
+        the answer is checked exactly as an API caller's would be. Nothing
+        here defaults, coerces or guesses; the alternative to asking is
+        stopping, and inventing a member number in an application that writes
+        to member records is not on the list.
+        """
+        ask = getattr(self.escalate, "ask", None)
+        if not callable(ask):
+            return False
+
+        missing = [
+            name
+            for name, spec in self.artifact.inputs.items()
+            if spec.required and inputs.get(name) in (None, "")
+        ]
+        if not missing or len(missing) != len(problems):
+            return False
+
+        supplied = ask({name: self.artifact.inputs[name] for name in missing})
+        if not supplied:
+            return False
+
+        inputs.update(supplied)
+        if self.recorder:
+            self.recorder.event("inputs_supplied_by_operator", names=sorted(supplied))
+        notify = getattr(self.escalate, "resolved", None)
+        if callable(notify):
+            notify(True)
+        return True
 
     def _succeed(self) -> Result:
         if not self._verify(self.artifact.success.checkpoint):

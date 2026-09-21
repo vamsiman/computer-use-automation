@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Operator console</title>
+<meta http-equiv="refresh" content="{{ poll_seconds }}">
+<style>
+  :root { color-scheme: light dark; }
+  body {
+    font: 14px/1.5 -apple-system, "Segoe UI", system-ui, sans-serif;
+    margin: 0; padding: 24px; max-width: 900px;
+  }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  .sub { color: #666; margin: 0 0 24px; }
+  .card { border: 1px solid #ccc; border-radius: 6px; padding: 16px; margin-bottom: 16px; }
+  .card h2 { font-size: 15px; margin: 0 0 2px; }
+  .reason { font-weight: 600; margin: 8px 0; }
+  .quote {
+    border-left: 3px solid #999; padding: 6px 12px; margin: 8px 0;
+    background: rgba(127,127,127,.08); white-space: pre-wrap;
+  }
+  dl { display: grid; grid-template-columns: max-content 1fr; gap: 2px 16px; margin: 12px 0; }
+  dt { color: #666; }
+  dd { margin: 0; font-family: ui-monospace, Consolas, monospace; }
+  .pill {
+    display: inline-block; padding: 1px 8px; border-radius: 10px;
+    background: rgba(127,127,127,.18); font-size: 12px; margin-left: 6px;
+  }
+  form { display: inline; }
+  button { font: inherit; padding: 6px 14px; margin-right: 8px; cursor: pointer; }
+  button[disabled] { opacity: .4; cursor: not-allowed; }
+  .error { border: 1px solid #c33; background: rgba(204,51,51,.08); padding: 10px 14px;
+           border-radius: 6px; margin-bottom: 16px; }
+  .field { margin: 8px 0; }
+  .field label { display: block; color: #666; font-size: 13px; }
+  .field input { font: inherit; font-family: ui-monospace, Consolas, monospace;
+                 padding: 5px 8px; min-width: 260px; }
+  .hint { color: #888; font-size: 12px; }
+  details { margin-top: 12px; }
+  pre { font-size: 12px; overflow-x: auto; background: rgba(127,127,127,.08);
+        padding: 10px; border-radius: 4px; }
+  .empty { color: #666; padding: 32px 0; }
+</style>
+</head>
+<body>
+
+<h1>Operator console</h1>
+<p class="sub">
+  Runs that have stopped and want a person. The application itself is the
+  browser window already open beside this one &mdash; that window
+  <em>is</em> the live session, which is why taking control means clicking in
+  it rather than here.
+</p>
+
+{% if error %}<div class="error">{{ error }}</div>{% endif %}
+
+{% if not interventions %}
+  <p class="empty">Nothing is waiting. This page refreshes every {{ poll_seconds }}s.</p>
+{% endif %}
+
+{% for item in interventions %}
+<div class="card">
+  <h2>
+    {{ item.capability or "capability unknown" }}
+    <span class="pill">{{ item.state }}</span>
+    <span class="pill">session {{ item.session_state }}</span>
+    <span class="pill">control: {{ item.control }}</span>
+  </h2>
+
+  <p class="reason">{{ item.reason }}</p>
+
+  {% if item.observed %}
+    {# The application's own wording, verbatim. An operator deciding whether
+       to clear a compliance hold needs the bank's words, not ours. #}
+    <div class="quote">{{ item.observed }}</div>
+  {% endif %}
+
+  <dl>
+    {% if item.step_id %}<dt>step</dt><dd>{{ item.step_id }} &mdash; {{ item.intent }}</dd>{% endif %}
+    <dt>where</dt><dd>{{ item.location or "&mdash;" | safe }}</dd>
+    <dt>inputs</dt><dd>{{ item.inputs }}</dd>
+    <dt>opened</dt><dd>{{ item.opened_at }}</dd>
+    {% if item.verified is not none %}
+      <dt>re-checked</dt><dd>{{ "passed" if item.verified else "failed" }}</dd>
+    {% endif %}
+  </dl>
+
+  {% if item.fields %}
+    {# Typed fields, never a free-text box. Each one is validated against the
+       capability's own contract on submit, by the same code that checks an
+       API caller's arguments. #}
+    <form method="post" action="/interventions/{{ item.id }}/answer">
+      <p class="reason">This run needs a value before it can continue.</p>
+      {% for field in item.fields %}
+        <div class="field">
+          <label for="{{ item.id }}-{{ field.name }}">
+            {{ field.name }} &mdash; {{ field.type }}{% if field.required %} (required){% endif %}
+          </label>
+          {% if field.enum %}
+            <select id="{{ item.id }}-{{ field.name }}" name="{{ field.name }}">
+              {% for option in field.enum %}<option>{{ option }}</option>{% endfor %}
+            </select>
+          {% else %}
+            <input id="{{ item.id }}-{{ field.name }}" name="{{ field.name }}"
+                   {% if field.pattern %}pattern="{{ field.pattern }}"{% endif %}
+                   {% if field.required %}required{% endif %}>
+          {% endif %}
+          <div class="hint">
+            {{ field.description }}
+            {% if field.pattern %}<code>{{ field.pattern }}</code>{% endif %}
+          </div>
+        </div>
+      {% endfor %}
+      <button type="submit">Supply and continue</button>
+    </form>
+  {% endif %}
+
+  <p>
+    <form method="post" action="/interventions/{{ item.id }}/grant">
+      <button type="submit" {% if not item.can_grant %}disabled{% endif %}>
+        Take control
+      </button>
+    </form>
+    <form method="post" action="/interventions/{{ item.id }}/resume">
+      <button type="submit" {% if not item.can_release %}disabled{% endif %}>
+        Hand back
+      </button>
+    </form>
+    <form method="post" action="/interventions/{{ item.id }}/cancel">
+      <button type="submit" {% if not item.can_cancel %}disabled{% endif %}>
+        Cancel run
+      </button>
+    </form>
+  </p>
+
+  <p class="hint">
+    {# Worth saying on the page, because the button's name suggests otherwise.
+       Handing back returns the controls; it does not declare the step done. #}
+    Handing back returns the session to the automation, which re-checks the
+    screen for itself before continuing. It does not mark the step complete.
+  </p>
+
+  {% if item.human_actions %}
+    <details>
+      <summary>{{ item.human_actions | length }} action(s) recorded during this handoff</summary>
+      <pre>{% for action in item.human_actions %}{{ action.at }}  {{ action.kind }}  {{ action.role }} {{ action.name }}{% if action.value %} = {{ action.value }}{% endif %}
+{% endfor %}</pre>
+    </details>
+  {% endif %}
+
+  {% if item.tree_text %}
+    <details>
+      <summary>What the automation could see</summary>
+      {# The tree rather than a screenshot: this is what perception actually
+         had to work with, and the gap between it and the picture is usually
+         the answer to why the run stopped. #}
+      <pre>{{ item.tree_text }}</pre>
+    </details>
+  {% endif %}
+</div>
+{% endfor %}
+
+</body>
+</html>

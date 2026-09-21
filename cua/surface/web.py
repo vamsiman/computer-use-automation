@@ -353,6 +353,16 @@ class WebSurface:
     def _watch(self, method: str) -> list[dict]:
         records: list[dict] = []
         for frame in self.page.frames:
+            # `evaluate` waits for an execution context, so a frame that is
+            # detached or mid-navigation blocks until Playwright's own
+            # timeout rather than failing quickly. Checking first is cheap
+            # and keeps a bookkeeping call off the critical path of a
+            # handoff, where the person is already waiting.
+            try:
+                if frame.is_detached():
+                    continue
+            except Exception:
+                continue
             try:
                 # Frames loaded before the init script existed need the script
                 # itself; the guard inside it makes a second evaluation free.

@@ -94,6 +94,27 @@ class InputSpec(_Model):
             re.compile(value)
         return value
 
+    def problems(self, name: str, value: Any) -> list[str]:
+        """Why this value is not acceptable for this parameter.
+
+        Lives on the spec so there is exactly one answer to the question. A
+        caller's arguments are checked by it before a browser is opened, and
+        an operator typing a value into the console is checked by the same
+        code -- otherwise the console would be a second, laxer front door into
+        the same capability, which is the sort of asymmetry nobody notices
+        until it matters.
+        """
+        if value is None or value == "":
+            return [f"required input {name!r} was not supplied"] if self.required else []
+
+        text = str(value)
+        found = []
+        if self.pattern and not re.fullmatch(self.pattern, text):
+            found.append(f"input {name!r} = {text!r} does not match {self.pattern}")
+        if self.enum and text not in self.enum:
+            found.append(f"input {name!r} = {text!r} is not one of {self.enum}")
+        return found
+
 
 class OutputSpec(_Model):
     """One typed value the caller gets back."""

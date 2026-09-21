@@ -112,6 +112,9 @@ def session(live_app, manager) -> Session:
         browser=session.browser,
         base_url=session.base_url,
     )
+    # Registered so the console can reach it by id, the same way it would
+    # reach any other live session.
+    manager._sessions[run.id] = run
     run.start(run_id="live-handoff")
     return run
 
@@ -332,3 +335,59 @@ def test_the_automation_is_refused_while_the_person_holds_the_window(
 
     assert refused, "automation was allowed to act during the handoff"
     assert isinstance(result, Success), getattr(result, "reason", result)
+
+
+# --- the operator console, against the real browser ----------------------
+
+
+def test_the_console_drives_a_real_handoff(session, manager, artifact, policy):
+    """The console's three buttons, a live Chromium window, and a compliance
+    hold on a real member.
+
+    The shape is exactly the production one, with a single substitution: a
+    real operator reads the console on one monitor and clicks Acknowledge in
+    the browser window on the other, while the run waits. Here the clicking is
+    Playwright, because a test has no hands -- and it has to happen on the
+    thread that owns the page, which is the thread the run is parked on. The
+    console calls are ordinary HTTP and do not care which thread they come
+    from.
+    """
+    from cua.operator import create_app
+    from cua.session import InterventionRegistry
+
+    registry = InterventionRegistry()
+    client = create_app(manager, registry).test_client()
+
+    class ConsoleOperator(ScriptedOperator):
+        def _wait(self) -> bool:
+            listed = client.get("/api/state").get_json()["interventions"]
+            assert listed, "the console did not show the paused run"
+            item = listed[0]
+            assert item["session_state"] == "awaiting_human"
+            assert item["can_grant"] is True
+            assert "Compliance Hold" in (item["observed"] or "")
+            self.seen = item
+
+            client.post(f"/interventions/{item['id']}/grant")
+            assert self.session.state is RunState.HUMAN_CONTROL
+
+            acknowledge(self.session.surface)  # the other monitor
+
+            client.post(f"/interventions/{item['id']}/resume")
+            return True
+
+    handoff = ConsoleOperator(
+        session, registry=registry, capability=artifact.ref, do=None
+    )
+    result = replay(session, artifact, policy, handoff)
+
+    assert isinstance(result, Success), getattr(result, "reason", result)
+    assert result.outputs["savings_balance"] == "22047.19"
+    assert handoff.seen["step_id"] == "s3"
+
+    done = client.get("/api/state").get_json()["interventions"][0]
+    assert done["state"] == "resolved"
+    assert done["verified"] is True
+    assert done["session_state"] == "running"
+    # The operator's click is on the record, reached through the console.
+    assert any(a["name"] == "Acknowledge" for a in done["human_actions"])

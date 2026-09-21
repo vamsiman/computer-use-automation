@@ -93,6 +93,12 @@ class InterventionRequest:
     #: to supply a value gets a field validated against the artifact's input
     #: schema, never a box to guess into.
     inputs: dict[str, Any] = field(default_factory=dict)
+    #: Parameters the run is *asking* for, name -> the declared spec. The
+    #: console renders these as typed fields validated by the capability's own
+    #: contract, never as a box to type anything into. An automation that
+    #: accepts a free-text answer to "what is the member number" has just
+    #: moved the fabrication from the machine to the form.
+    needs: dict[str, Any] = field(default_factory=dict)
     opened_at: datetime = field(default_factory=_now)
 
     def summary(self) -> str:
@@ -120,6 +126,8 @@ class Intervention:
     #: Whether the step's checkpoint held afterwards. ``None`` until the
     #: engine has asked, which is the only authority on the question.
     verified: bool | None = None
+    #: What a person typed in, already validated against the contract.
+    supplied: dict[str, Any] = field(default_factory=dict)
     note: str = ""
 
     @property
@@ -132,6 +140,7 @@ class Intervention:
 
     def as_dict(self) -> dict[str, Any]:
         data = asdict(self.request)
+        data["needs"] = sorted(self.request.needs)
         data["opened_at"] = self.request.opened_at.isoformat()
         return {
             **data,
@@ -139,6 +148,7 @@ class Intervention:
             "granted_at": self.granted_at.isoformat() if self.granted_at else None,
             "closed_at": self.closed_at.isoformat() if self.closed_at else None,
             "verified": self.verified,
+            "supplied": sorted(self.supplied),
             "note": self.note,
             "human_actions": [action.as_dict() for action in self.human_actions],
         }
@@ -227,7 +237,69 @@ class Handoff:
 
     def __call__(self, step: Any, reason: str, snapshot: Any) -> bool:
         """True if a person dealt with it and the run should carry on."""
-        intervention = self.registry.open(self._request(step, reason, snapshot))
+        intervention = self._open(reason, step=step, snapshot=snapshot)
+        return self._settle(intervention, self._wait())
+
+    def ask(self, needs: Mapping[str, Any]) -> dict[str, Any] | None:
+        """Ask a person for values the caller did not supply.
+
+        The other half of the escalation protocol, and the reason the console
+        has typed fields at all. Invoked when a capability cannot run for want
+        of a parameter -- which is a question, not a fault, and answering it
+        by inventing a member number is the one thing this system must never
+        do. A person answers, the answer is checked against the capability's
+        own contract, and only then does anything touch the application.
+
+        Returns the supplied values, or ``None`` if nobody answered.
+        """
+        wanted = ", ".join(sorted(needs))
+        intervention = self._open(f"the run needs a value for {wanted}", needs=needs)
+        if not self._settle(intervention, self._wait()):
+            return None
+        return dict(intervention.supplied)
+
+    def provide(self, values: Mapping[str, Any]) -> list[str]:
+        """Accept an operator's answers. Returns why they were refused.
+
+        Checked by the capability's own ``InputSpec``, so the console cannot
+        be a laxer front door into the same capability than the API is.
+        """
+        intervention = self.current
+        if intervention is None:
+            return ["there is no open intervention to answer"]
+
+        specs = intervention.request.needs
+        problems: list[str] = []
+        accepted: dict[str, Any] = {}
+        for name, value in values.items():
+            spec = specs.get(name)
+            if spec is None:
+                problems.append(f"{name!r} is not something this run asked for")
+                continue
+            found = spec.problems(name, value)
+            problems.extend(found)
+            if not found:
+                accepted[name] = value
+
+        missing = [name for name in specs if name not in accepted]
+        problems.extend(f"still missing a value for {name!r}" for name in missing)
+        if problems:
+            return problems
+
+        intervention.supplied = accepted
+        return []
+
+    def _open(
+        self,
+        reason: str,
+        *,
+        step: Any = None,
+        snapshot: Any = None,
+        needs: Mapping[str, Any] | None = None,
+    ) -> Intervention:
+        intervention = self.registry.open(
+            self._request(step, reason, snapshot, needs)
+        )
         self.current = intervention
         self.history.append(intervention)
 
@@ -242,9 +314,9 @@ class Handoff:
                 reason=reason,
                 observed=intervention.request.observed,
                 screenshot=intervention.request.screenshot_ref,
+                needs=sorted(intervention.request.needs),
             )
-
-        return self._settle(intervention, self._wait())
+        return intervention
 
     def _wait(self) -> bool:
         """Park the automation until somebody hands the session back.
@@ -297,7 +369,13 @@ class Handoff:
 
     # --- internals -------------------------------------------------------
 
-    def _request(self, step: Any, reason: str, snapshot: Any) -> InterventionRequest:
+    def _request(
+        self,
+        step: Any,
+        reason: str,
+        snapshot: Any,
+        needs: Mapping[str, Any] | None = None,
+    ) -> InterventionRequest:
         screenshot = None
         if self.recorder is not None:
             screenshot = self.recorder.screenshot(
@@ -316,6 +394,7 @@ class Handoff:
             tree_text=snapshot.text_view() if hasattr(snapshot, "text_view") else "",
             screenshot_ref=screenshot,
             inputs=self._safe_inputs(),
+            needs=dict(needs or {}),
         )
 
     def _safe_inputs(self) -> dict[str, Any]:

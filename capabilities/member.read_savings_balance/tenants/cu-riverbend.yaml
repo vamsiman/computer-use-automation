@@ -1,0 +1,47 @@
+# Riverbend's variation on the same capability.
+#
+# A sparse document on purpose: it names the base it extends and lists only
+# what differs. Everything absent here -- the contract, the steps, the
+# outcomes, the recoveries -- is the base capability's, and stays that way as
+# the base changes. A forked copy would start drifting the day it was written.
+#
+# There is exactly one difference, and it is the most ordinary kind of drift
+# there is: this deployment calls the field "Member Number" instead of
+# "Member ID". The field still has no accessible name of its own, so the label
+# beside it is the only thing there is to anchor on, and a one-word change to
+# that label is enough to push the step down a tier.
+#
+# Worth noting what is NOT here. Riverbend also puts its Balance column second
+# instead of third, and s5 needs no override at all: it is keyed on the column
+# *name*, so it follows the move. The structural fallback underneath it would
+# have resolved too -- and read the account number, confidently and wrongly.
+# That contrast is the argument for the tier order.
+
+schema_version: '1.0'
+
+capability:
+  id: member.read_savings_balance
+  version: 1.0.0
+  title: Read a member's savings balance (Riverbend)
+  description: >-
+    Riverbend's deployment of the same capability. Same signature, same steps,
+    one differently-worded field.
+  app:
+    vendor: meridian
+    product: MemberConsole
+    version_range: '>=4.2 <5.0'
+  tenant: cu-riverbend
+  extends: member.read_savings_balance@1.0.0
+  status: approved
+
+steps:
+  - id: s2
+    target:
+      primary: {strategy: label_proximity, label: 'Member Number:', direction: right}
+      fallbacks:
+        - {strategy: region_path, region: 'form[0]', path: 'table[0]/row[0]/cell[2]/textbox[0]'}
+      confidence: 0.9
+      note: >-
+        Riverbend's wording. The base's 'Member ID:' anchor cannot resolve
+        here, which is what sends the unmodified capability down to the
+        structural fallback.

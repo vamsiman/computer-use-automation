@@ -1,0 +1,30 @@
+{
+  "capability": "member.read_savings_balance@1.0.0",
+  "run_id": "02-business-outcome-not-found",
+  "evidence_ref": "evidence/runs/02-business-outcome-not-found",
+  "steps_executed": 3,
+  "duration_ms": 1394,
+  "tier_log": [
+    {
+      "step_id": "s2",
+      "intent": "Enter the member number into the search field",
+      "strategy": "label_proximity",
+      "tier": 0,
+      "degraded": false,
+      "match_count": 1
+    },
+    {
+      "step_id": "s3",
+      "intent": "Submit the search",
+      "strategy": "role_name",
+      "tier": 0,
+      "degraded": false,
+      "match_count": 1
+    }
+  ],
+  "recoveries": [],
+  "code": "MEMBER_NOT_FOUND",
+  "message": "No member exists with that number.",
+  "partial_outputs": {},
+  "step_id": "s3"
+}

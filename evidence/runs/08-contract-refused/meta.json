@@ -1,0 +1,28 @@
+{
+  "run_id": "08-contract-refused",
+  "mode": "replay",
+  "tenant": null,
+  "model": null,
+  "goal": null,
+  "inputs": {
+    "member_id": "abc"
+  },
+  "retention": {
+    "screenshots": true,
+    "failure_bundle": true,
+    "page_source": true
+  },
+  "capability": {
+    "id": "member.read_savings_balance",
+    "version": "1.0.0",
+    "status": "approved",
+    "title": "Read a member's savings balance",
+    "tenant": null
+  },
+  "schema_version": "1.0",
+  "finished_at": "2026-09-21T01:21:46.567752+00:00",
+  "duration_ms": 8,
+  "events": 2,
+  "result": "Failure",
+  "started_at": "2026-09-21T01:21:46.559259+00:00"
+}

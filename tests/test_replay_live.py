@@ -133,15 +133,22 @@ def test_the_tier_log_says_how_each_control_was_found(surface, artifact, policy)
     assert strategy["s5"] == LocatorStrategy.ROW_CELL.value
 
 
-def test_a_degraded_step_is_visible_in_the_result(surface, artifact, policy):
-    """s2's primary rule is aspirational -- kept so that if the vendor ever
-    labels the field properly we resolve a tier better and the log says so.
-    Until then it is recorded as degraded, which is what a drift signal looks
-    like when it is working."""
+def test_a_healthy_run_reports_nothing_degraded(surface, artifact, policy):
+    """Every step on its own primary rule, against the application this
+    capability was written for.
+
+    This is what makes the tier log a drift signal rather than decoration.
+    The artifact once carried an aspirational primary on s2 that could never
+    resolve, so every successful run reported itself degraded -- and a warning
+    that is always on is one nobody reads. The degradation that *should* show
+    up is in ``test_tenant_live.py``, where the same artifact meets a
+    deployment that renamed the field.
+    """
     result = replay_for(surface, artifact, policy, "10001")
-    degraded = {entry.step_id for entry in result.degraded_steps}
-    assert "s2" in degraded
-    assert "s3" not in degraded
+
+    assert result.degraded_steps == ()
+    assert {e.step_id for e in result.tier_log} >= {"s2", "s3"}
+    assert all(entry.tier == 0 for entry in result.tier_log), result.tier_log
 
 
 # --- the other three results ---------------------------------------------
@@ -194,7 +201,9 @@ def test_a_replay_leaves_a_complete_bundle(surface, artifact, policy, tmp_path):
     ).run({"member_id": "10001"})
 
     assert isinstance(result, Success)
-    assert result.evidence_ref == str(recorder.dir)
+    # Posix separators on purpose: this string is written into a JSON
+    # deliverable that gets read on machines other than the one that ran.
+    assert result.evidence_ref == recorder.dir.as_posix()
     assert (recorder.dir / "result.json").exists()
 
     written = json.loads((recorder.dir / "result.json").read_text(encoding="utf-8"))

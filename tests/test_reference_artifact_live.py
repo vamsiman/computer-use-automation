@@ -23,7 +23,7 @@ from cua.artifact import CapabilityStore, validate
 from cua.locators import LabelProximitySpec, Locator, RoleNameSpec
 from cua.primitives import Action
 from cua.surface.web import BrowserSession
-from cua.types import ActionType
+from cua.types import LocatorStrategy, ActionType
 from targetapp import exceptional, seed
 from targetapp.app import APP_PASS, APP_USER, create_app
 
@@ -110,12 +110,20 @@ def test_search_screen_locators_resolve_at_expected_tiers(surface, artifact):
     checkpoint = surface.resolve(artifact.step("s1").checkpoint.target, snap)
     assert checkpoint.resolved and checkpoint.tier == 0
 
-    # The interesting one: the preferred rule genuinely misses, because the
-    # field has no accessible name, and the label rule recovers it.
+    # The interesting one. This field has no accessible name at all, so
+    # role+name cannot reach it and the capability leads with the label rule
+    # instead -- on its own primary, not degraded.
+    #
+    # An aspirational `role_name` primary used to sit above it, on the theory
+    # that if the vendor ever labelled the field properly we would resolve a
+    # tier better for free. It had to go: it never resolved, so every healthy
+    # run reported this step degraded, and a drift signal that is always on is
+    # not a signal. A chain holds rules that have been seen to work.
     field = surface.resolve(artifact.step("s2").target, snap)
     assert field.resolved
-    assert field.tier == 1
-    assert field.degraded
+    assert field.tier == 0
+    assert field.strategy is LocatorStrategy.LABEL_PROXIMITY
+    assert not field.degraded
 
     button = surface.resolve(artifact.step("s3").target, snap)
     assert button.resolved and button.tier == 0

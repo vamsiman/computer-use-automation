@@ -1,0 +1,15 @@
+{
+  "capability": "member.read_savings_balance@1.0.0",
+  "run_id": "08-contract-refused",
+  "evidence_ref": "evidence/runs/08-contract-refused",
+  "steps_executed": 0,
+  "duration_ms": 0,
+  "tier_log": [],
+  "recoveries": [],
+  "category": "contract",
+  "step_id": null,
+  "intent": "",
+  "expected": "member.read_savings_balance(member_id: string) -> {member_name: string, savings_balance: money}",
+  "observed": "input 'member_id' = 'abc' does not match ^[0-9]{5}$",
+  "detail": null
+}

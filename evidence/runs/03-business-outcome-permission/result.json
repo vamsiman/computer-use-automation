@@ -1,0 +1,30 @@
+{
+  "capability": "member.read_savings_balance@1.0.0",
+  "run_id": "03-business-outcome-permission",
+  "evidence_ref": "evidence/runs/03-business-outcome-permission",
+  "steps_executed": 3,
+  "duration_ms": 1376,
+  "tier_log": [
+    {
+      "step_id": "s2",
+      "intent": "Enter the member number into the search field",
+      "strategy": "label_proximity",
+      "tier": 0,
+      "degraded": false,
+      "match_count": 1
+    },
+    {
+      "step_id": "s3",
+      "intent": "Submit the search",
+      "strategy": "role_name",
+      "tier": 0,
+      "degraded": false,
+      "match_count": 1
+    }
+  ],
+  "recoveries": [],
+  "code": "PERMISSION_DENIED",
+  "message": "This operator is not permitted to view that member.",
+  "partial_outputs": {},
+  "step_id": "s3"
+}

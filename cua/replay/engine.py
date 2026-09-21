@@ -690,7 +690,11 @@ class ReplayEngine:
             result,
             capability=result.capability or self.artifact.ref,
             run_id=self.recorder.run_id if self.recorder else None,
-            evidence_ref=str(self.recorder.dir) if self.recorder else None,
+            # Posix separators even on Windows: this string is written into a
+            # JSON deliverable that gets read on other machines.
+            evidence_ref=(
+                self.recorder.dir.as_posix() if self.recorder else None
+            ),
             steps_executed=self.steps_executed,
             duration_ms=int((time.perf_counter() - began) * 1000),
             tier_log=tuple(self.tier_log),

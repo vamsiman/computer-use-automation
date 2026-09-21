@@ -1,0 +1,28 @@
+{
+  "run_id": "06-escalation-handoff",
+  "mode": "replay",
+  "tenant": null,
+  "model": null,
+  "goal": null,
+  "inputs": {
+    "member_id": "10005"
+  },
+  "retention": {
+    "screenshots": true,
+    "failure_bundle": true,
+    "page_source": true
+  },
+  "capability": {
+    "id": "member.read_savings_balance",
+    "version": "1.0.0",
+    "status": "approved",
+    "title": "Read a member's savings balance",
+    "tenant": null
+  },
+  "schema_version": "1.0",
+  "finished_at": "2026-09-21T01:21:40.609803+00:00",
+  "duration_ms": 10178,
+  "events": 18,
+  "result": "Success",
+  "started_at": "2026-09-21T01:21:30.431431+00:00"
+}

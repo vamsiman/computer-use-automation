@@ -74,14 +74,19 @@ steps:
     intent: Enter the member number into the search field
     action: type
     target:
-      primary: {strategy: role_name, role: textbox, name: Member ID}
+      primary: {strategy: label_proximity, label: 'Member ID:', direction: right}
       fallbacks:
-        - {strategy: label_proximity, label: 'Member ID:', direction: right}
         - {strategy: region_path, region: 'form[0]', path: 'table[0]/row[0]/cell[2]/textbox[0]'}
-      confidence: 0.9
+      confidence: 0.85
       note: >-
-        Resolves at tier 1 in practice. The label is not programmatically
-        associated with the input, so tier 0 is aspirational.
+        The label is a bare span with no programmatic association, so this
+        field has no accessible name and role+name cannot reach it. An
+        aspirational `role_name` primary used to sit above this one, and it
+        had to go: it never resolved, so every healthy run reported itself
+        degraded and the tier log stopped meaning anything. A chain contains
+        rules that have been seen to work, and nothing else -- which is what
+        discovery does automatically, since it can only record what it
+        verified.
     args:
       value: '{{ inputs.member_id }}'
     risk: safe

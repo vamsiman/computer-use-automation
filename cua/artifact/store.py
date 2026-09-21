@@ -116,11 +116,22 @@ class CapabilityStore:
             validate_or_raise(artifact)
         return artifact
 
-    def load_tenant_override(self, capability_id: str, tenant: str) -> Artifact | None:
+    def load_tenant_override(self, capability_id: str, tenant: str) -> dict | None:
+        """The raw tenant document, not an ``Artifact``.
+
+        Deliberately unvalidated here, because a sparse override is not a
+        capability and cannot be made to look like one: a step that says only
+        where a control is has no intent and no action, and requiring it to
+        have them would mean copying both out of the base into every override
+        -- which is exactly the duplication this file exists to avoid.
+
+        :func:`cua.artifact.overrides.merge` validates the *result*, which is
+        the document that actually has to be coherent.
+        """
         path = self.tenant_path_for(capability_id, tenant)
         if not path.is_file():
             return None
-        return from_yaml(path.read_text(encoding="utf-8"))
+        return yaml.safe_load(path.read_text(encoding="utf-8")) or {}
 
     # --- listing ---
 

@@ -46,11 +46,11 @@ Working agreement: one issue per session. On completion, write a handoff to
 | 13 | Escalation, handoff, human action capture | #14 | 6, 11, 12 | done |
 | 13a | Discovery defects found by the first real model run | #21 | 9, 10, 11 | done |
 | 14 | Operator console | #15 | 13 | done |
-| 15 | CLI and capability catalog | #16 | 10, 11, 14 | todo |
-| 16 | Tenant variant and artifact overrides | #17 | 11, 15 | todo |
-| 17 | Evidence runs | #18 | 12, 13, 15 | todo |
-| 18 | Tests where they count | #19 | 11, 12, 13 | todo |
-| 19 | REPORT.md and README.md | #20 | 17 | todo |
+| 15 | CLI and capability catalog | #16 | 10, 11, 14 | done |
+| 16 | Tenant variant and artifact overrides | #17 | 11, 15 | done |
+| 17 | Evidence runs | #18 | 12, 13, 15 | done |
+| 18 | Tests where they count | #19 | 11, 12, 13 | done |
+| 19 | REPORT.md and README.md | #20 | 17 | done |
 
 ## Requirement coverage
 

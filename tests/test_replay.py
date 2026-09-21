@@ -598,22 +598,72 @@ def test_transforms(raw, kind, expected):
 
 
 def test_replay_imports_no_model_client():
-    """Determinism by construction rather than by discipline. There is nothing
-    available to this package that could make a different choice on a
-    Tuesday."""
+    """Determinism by construction rather than by discipline.
+
+    Checked as an *import graph* in a fresh interpreter, not as a grep over
+    the source. A grep passes happily while a module three levels down pulls
+    in a client, and "no module here says the word anthropic" is a much weaker
+    claim than "loading the replay engine does not make a model client
+    reachable".
+    """
+    import subprocess
+    import sys
+
+    probe = (
+        "import sys, json; import cua.replay; "
+        "print(json.dumps(sorted(m for m in sys.modules "
+        "if m.split('.')[0] in ('anthropic', 'openai') "
+        "or m.startswith('cua.discovery'))))"
+    )
+    out = subprocess.run(
+        [sys.executable, "-c", probe], capture_output=True, text=True, check=True
+    )
+    import json
+
+    reachable = json.loads(out.stdout.strip().splitlines()[-1])
+    assert reachable == [], reachable
+
+
+def test_the_replay_package_names_no_model_client(artifact):
+    """And the flat reading too, because it localises a regression.
+
+    The import-graph test says something went wrong; this one says which file.
+    """
     import pkgutil
+    from pathlib import Path as _Path
 
     import cua.replay
 
     banned = ("anthropic", "openai", "cua.discovery")
     for module in pkgutil.iter_modules(cua.replay.__path__):
-        source = (
-            __import__("pathlib")
-            .Path(cua.replay.__path__[0], f"{module.name}.py")
-            .read_text(encoding="utf-8")
+        source = _Path(cua.replay.__path__[0], f"{module.name}.py").read_text(
+            encoding="utf-8"
         )
         for name in banned:
             assert f"import {name}" not in source, (module.name, name)
+
+
+def test_the_same_inputs_take_the_same_path_twice(artifact, engine_policy):
+    """Determinism stated as an observation rather than an architecture claim.
+
+    Two runs of one capability against one screen produce identical step
+    sequences, identical locator tiers and identical outputs. Nothing here
+    consults a clock, a random source or a model.
+    """
+    def once():
+        surface = FakeSurface(
+            [screen("Member Search"), screen("Member Search"), screen("Member Details")],
+            values={"member_name": "Dana", "savings_balance": "4,210.33"},
+        )
+        result = run(artifact, surface, engine_policy)
+        return (
+            result.kind,
+            result.outputs,
+            [(e.step_id, str(e.strategy), e.tier) for e in result.tier_log],
+            [(a.type, str(a.target.describe() if a.target else "")) for a in surface.acted],
+        )
+
+    assert once() == once()
 
 
 # --- the retry strategy, where it genuinely applies -----------------------

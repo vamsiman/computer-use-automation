@@ -186,6 +186,11 @@ def main() -> int:
     parser.add_argument("--case", default="handoff")
     parser.add_argument("--list", action="store_true")
     parser.add_argument("--headless", action="store_true")
+    parser.add_argument(
+        "--exit-when-done",
+        action="store_true",
+        help="Stop as soon as the run finishes, like `cua replay` does.",
+    )
     args = parser.parse_args()
 
     if args.list:
@@ -333,10 +338,23 @@ def main() -> int:
             say(f"  handoff   {item.state}, re-verified={item.verified}, "
                 f"{len(item.human_actions)} human action(s)")
         say(f"  evidence  {recorder.dir}")
-        say(f"  expected  {expect}")
+        say(f"  should be {expect}")
         say("=" * 70)
         recorder.finish(result)
-        say("\nstack still up -- ctrl-c to stop")
+
+        # Said plainly: the previous wording read like the run was still
+        # waiting for somebody. It is not -- the answer above is final.
+        say("")
+        say("  THE RUN IS OVER. Nothing is waiting for you.")
+        if args.exit_when_done:
+            say("")
+            return 0 if result.ok else 1
+        say("")
+        say("  The app and console stay up only so you can look around:")
+        say(f"    console   {console.url}")
+        say(f"    app       {url}")
+        say("  Press Ctrl-C when you are done.")
+        say("")
         while True:
             time.sleep(1)
     except KeyboardInterrupt:

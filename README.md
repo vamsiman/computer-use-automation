@@ -59,9 +59,24 @@ Python 3.11+.
 
 ```bash
 python -m venv .venv
-.venv/Scripts/activate          # Windows;  source .venv/bin/activate elsewhere
+
+# Activate it. The `cua` command below is installed into the venv, so it is
+# only on your PATH once this has run.
+.venv\Scripts\Activate.ps1      # Windows PowerShell
+# .venv\Scriptsctivate.bat    # Windows cmd
+# source .venv/bin/activate      # macOS / Linux
+
 pip install -e ".[dev]"
 playwright install chromium
+```
+
+If `cua` comes back as "not recognized" or "command not found", the virtual
+environment is not active. Either activate it, or run the module directly —
+this always works:
+
+```bash
+.venv/Scripts/python -m cua.cli.main list      # Windows
+./.venv/bin/python -m cua.cli.main list        # macOS / Linux
 ```
 
 Only **discovery** needs an API key. Everything else — replay, the error

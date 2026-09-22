@@ -8,6 +8,9 @@ venv/
 # secrets - never commit
 .env
 
+# diagnostic output, written where you run it
+diagnose-watch.txt
+
 # local run scratch (evidence/ itself IS a deliverable and is committed)
 /runs/
 *.db

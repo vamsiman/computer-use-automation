@@ -8,6 +8,18 @@ screen; the operator console lists the paused run.
 From there it is a real handoff: take control in the console, press
 Acknowledge in the browser window, hand back, and watch the run re-verify the
 screen for itself and finish.
+
+**Which thread owns what.** Playwright's sync API belongs to the thread that
+created the page, so the browser is created *and* driven on one thread and
+everything else arranges itself around that. Here the automation runs on the
+main thread and the console serves from another, which is the production shape
+too -- it works because the console never touches the browser. It reads session
+state and moves the control token; the only things that ever act on the page
+are the automation and a person's actual mouse.
+
+An earlier version of this script created the browser on the main thread and
+replayed from a worker. It failed at step one with a greenlet error, which is
+a good demonstration of why the rule is worth writing down.
 """
 
 from __future__ import annotations
@@ -27,7 +39,6 @@ from cua.artifact.store import CapabilityStore  # noqa: E402
 from cua.evidence import EvidenceConfig, Recorder  # noqa: E402
 from cua.operator import ConsoleServer  # noqa: E402
 from cua.policy import Allowlist, Policy, PolicyEngine, RiskPolicy  # noqa: E402
-from cua.primitives import Action  # noqa: E402
 from cua.replay import ReplayEngine  # noqa: E402
 from cua.session import (  # noqa: E402
     Credentials,
@@ -41,19 +52,23 @@ from cua.types import ActionType, RiskLevel  # noqa: E402
 from targetapp import exceptional, seed  # noqa: E402
 from targetapp.app import APP_PASS, APP_USER, create_app  # noqa: E402
 
-APP_PORT = 5000
-CONSOLE_PORT = 5100
+APP_PORT = int(os.environ.get("DEMO_APP_PORT", 5000))
+CONSOLE_PORT = int(os.environ.get("DEMO_CONSOLE_PORT", 5100))
 MEMBER = os.environ.get("DEMO_MEMBER", "10005")
 
-# A person needs longer than a test does.
+# A person needs longer to read a screen than a test does.
 os.environ.setdefault("CUA_HANDOFF_TIMEOUT", "1800")
+
+
+def say(text: str = "") -> None:
+    print(text, flush=True)
 
 
 def policy_for(url: str) -> PolicyEngine:
     return PolicyEngine(
         Policy(
             allowlist=Allowlist(
-                origins=(url, f"http://localhost:{APP_PORT}"),
+                origins=(url, f"http://127.0.0.1:{APP_PORT}"),
                 paths=("/", "/home", "/members/**"),
                 actions=frozenset(
                     {
@@ -77,18 +92,20 @@ def main() -> int:
     url = f"http://localhost:{APP_PORT}"
     app_server = make_server("127.0.0.1", APP_PORT, create_app(), threaded=True)
     threading.Thread(target=app_server.serve_forever, daemon=True).start()
-    print(f"target application   {url}")
+    say(f"target application   {url}")
 
     manager = SessionManager()
     registry = InterventionRegistry()
     handoffs: dict[str, Handoff] = {}
     console = ConsoleServer(manager, registry, handoffs, port=CONSOLE_PORT)
-    print(f"operator console     {console.start()}")
+    say(f"operator console     {console.start()}")
 
     # Headed on purpose. The window that opens IS the live session -- that is
     # what makes the handoff real rather than simulated.
     session = manager.create(url, headless=False)
-    authenticate(session.surface, Credentials(user=APP_USER, password=APP_PASS))
+    credentials = Credentials(user=APP_USER, password=APP_PASS)
+    authenticate(session.surface, credentials)
+    say("signed in")
 
     run = Session(
         id="demo", surface=session.surface, browser=session.browser, base_url=url
@@ -111,62 +128,76 @@ def main() -> int:
     )
     handoffs[run.id] = handoff
 
-    print(f"\nreplaying {artifact.capability.id} with member_id={MEMBER}")
-    print("the browser window is the live session\n")
+    say(f"\nreplaying {artifact.capability.id} with member_id={MEMBER}")
+    say("the browser window that just opened is the live session\n")
 
-    result_box: dict[str, object] = {}
+    def announce() -> None:
+        """Tell the person what to do once the run has actually stopped.
 
-    def drive():
-        result_box["result"] = ReplayEngine(
+        On its own thread because the automation thread is about to block
+        inside the handoff, which is the entire point of the demo.
+        """
+        for _ in range(240):
+            if run.state.value == "awaiting_human":
+                break
+            time.sleep(0.5)
+        else:
+            return
+        say("=" * 70)
+        say("  The run stopped.")
+        say("")
+        say(f"  Member {MEMBER} is flagged for compliance review, and nothing in")
+        say("  the capability declares that state. So it did not guess -- it")
+        say("  asked, and it is holding the session open while it waits.")
+        say("")
+        say(f"  Console:  {console.url}")
+        say("")
+        say("  1. press 'Take control' in the console")
+        say("  2. press 'Acknowledge' in the browser window")
+        say("  3. press 'Hand back' in the console")
+        say("")
+        say("  The engine re-checks the screen for itself before continuing.")
+        say("  Hand back without acknowledging and it will stop and ask again.")
+        say("=" * 70)
+        try:
+            webbrowser.open(console.url)
+        except Exception:
+            pass
+
+    threading.Thread(target=announce, daemon=True).start()
+
+    try:
+        # On this thread, because this thread owns the browser.
+        result = ReplayEngine(
             run.controlled,
             artifact,
             policy=policy_for(url),
             recorder=recorder,
             session_id=run.id,
             escalate=handoff,
-            reauthenticate=lambda: authenticate(
-                session.surface, Credentials(user=APP_USER, password=APP_PASS)
-            ),
+            reauthenticate=lambda: authenticate(session.surface, credentials),
         ).run({"member_id": MEMBER})
 
-    worker = threading.Thread(target=drive, daemon=True)
-    worker.start()
-
-    time.sleep(6)
-    if run.state.value == "awaiting_human":
-        print("=" * 68)
-        print("  The run stopped. Member 10005 is flagged for compliance review")
-        print("  and nothing in the capability declares that state, so it did")
-        print("  not guess -- it asked.")
-        print()
-        print(f"  Console:  {console.url}")
-        print()
-        print("  1. press 'Take control'")
-        print("  2. press 'Acknowledge' in the browser window")
-        print("  3. press 'Hand back'")
-        print()
-        print("  The engine re-checks the screen for itself before continuing.")
-        print("=" * 68)
-    try:
-        webbrowser.open(console.url)
-    except Exception:
-        pass
-
-    try:
-        while worker.is_alive():
-            time.sleep(1)
-        result = result_box.get("result")
-        print(f"\n{'=' * 68}")
-        print(f"  {type(result).__name__}: {getattr(result, 'outputs', '')}")
-        print(f"  session state: {run.state.value}")
-        print(f"  evidence: {recorder.dir}")
-        print("=" * 68)
+        say("")
+        say("=" * 70)
+        say(f"  {type(result).__name__}   {getattr(result, 'outputs', '') or ''}")
+        say(f"  session state  {run.state.value}")
+        for entry in result.tier_log:
+            mark = "  <- degraded" if entry.degraded else ""
+            say(f"    {entry.step_id}  {entry.strategy}{mark}")
+        if handoff.history:
+            item = handoff.history[0]
+            say(f"  intervention   {item.state}, re-verified: {item.verified}")
+            for action in item.human_actions:
+                say(f"    human: {action.describe()}")
+        say(f"  evidence       {recorder.dir}")
+        say("=" * 70)
         recorder.finish(result)
-        print("\nstack still up; ctrl-c to stop")
+        say("\nstack still up -- ctrl-c to stop")
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
-        print("\nstopping")
+        say("\nstopping")
     finally:
         manager.close_all()
         console.stop()

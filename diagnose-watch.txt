@@ -1,0 +1,49 @@
+app on http://localhost:57023
+on screen: 'Compliance Hold'
+
+--- BEFORE watch_start() ---
+  frame[0] http://localhost:57023/members/10005
+      origin=http://localhost:57023
+      listeners installed=False  window.__cuaWatch=undefined  active=None
+      sessionStorage flag=None
+      sessionStorage log=(empty)
+
+watcher.supported = True
+watcher.start() -> True
+
+--- AFTER watch_start() ---
+  frame[0] http://localhost:57023/members/10005
+      origin=http://localhost:57023
+      listeners installed=True  window.__cuaWatch=object  active=True
+      sessionStorage flag='1'
+      sessionStorage log=(empty)
+
+====================================================================
+  CLICK THE 'Acknowledge' BUTTON IN THE BROWSER WINDOW NOW.
+  (the Chromium window that just opened, not your normal browser)
+====================================================================
+
+click detected: True
+
+--- AFTER the human's click ---
+  frame[0] http://localhost:57023/members/10005
+      origin=http://localhost:57023
+      listeners installed=True  window.__cuaWatch=object  active=True
+      sessionStorage flag='1'
+      sessionStorage log=[{"id":"muc40sl7-8np0o0","at":"2026-09-22T03:23:49.819Z","kind":"click","role":"button","name":"Acknowledge","value":null,"ref":"f0n20","location":"http://localhost:57023/members/10005"}]
+
+watcher.drain() returned 1 record(s)
+  click button 'Acknowledge'   ref=f0n20  at=2026-09-22T03:23:49.819Z
+watcher.stop() total = 1 record(s)
+  click button 'Acknowledge'
+
+--- AFTER watch_stop() ---
+  frame[0] http://localhost:57023/members/10005
+      origin=http://localhost:57023
+      listeners installed=True  window.__cuaWatch=object  active=False
+      sessionStorage flag=None
+      sessionStorage log=(empty)
+
+====================================================================
+  VERDICT: watcher captured the click
+====================================================================

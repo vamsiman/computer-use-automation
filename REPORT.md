@@ -318,6 +318,62 @@ per-code budget cannot catch.
 
 ## 4. Heterogeneity and multi-tenancy
 
+Section 3.7 of the brief asks this to be *designed* rather than built, and
+names three questions. Two of them are answered by working code below; the
+first is answered by a seam that exists and a driver that does not.
+
+### Extending to another surface (designed, not built)
+
+The `Surface` protocol is five methods. A desktop driver on Windows UI
+Automation or the macOS AX API is a third implementation of them, and
+**nothing above that line changes** — not the artifact schema, not the replay
+engine, not the error taxonomy, not the session and control model, not the
+console.
+
+That is only true because of what crosses the seam. An accessibility tree and
+a locator chain mean the same thing on a web page and on a native window; CSS
+selectors and pixel coordinates would not. The mapping is close to mechanical:
+
+| ours | UI Automation | AX API |
+|---|---|---|
+| `A11yNode.role` | `ControlType` | `AXRole` |
+| `.name` | `Name` | `AXTitle` / `AXDescription` |
+| `.value` | `ValuePattern` | `AXValue` |
+| `.ref` | `RuntimeId` | element reference |
+| `.box` | `BoundingRectangle` | `AXFrame` |
+
+Four of the five locator strategies port directly, and `row_cell` gets
+*better*: UIA has an explicit `GridPattern`, so "the Balance on the Savings
+row" stops being an inference over `<table>` markup and becomes a query.
+
+**What genuinely does not port is `navigate`.** A desktop application has no
+URLs. On a legacy web app the first step is "go to this path"; on a desktop
+app it is "focus this window, open this menu". This is the one place the
+action vocabulary is web-shaped, and it is worth being precise about the
+consequence: the *steps* differ, the *schema* does not.
+
+The design already leans this way for a reason unrelated to desktop.
+`preconditions.entry_point` is a path, and it turned out to be useless even on
+the web — the target app is frameset-based, so the URL is identical on every
+screen. The entry condition is therefore a **landmark**, asserted as a
+checkpoint: *"this capability starts on the screen headed Member Search."*
+That formulation needs no URL and is exactly what a desktop capability would
+use. A real defect on the web produced the abstraction desktop would need.
+
+Two other seams were built duck-typed for the same reason. `page_source()` is
+not in the protocol, because a desktop surface has no markup and requiring one
+would make the protocol describe a browser; the recorder asks for it and does
+without. The same is true of the human-action watcher: a driver that cannot
+report what a person did says so, and the log records that it could not rather
+than implying they did nothing.
+
+**What would have to be written:** a `DesktopSurface` (observe/resolve/act/
+screenshot/close), a role vocabulary mapping, and a policy allowlist keyed on
+application identity and window titles rather than origins and paths. Perhaps
+a week. **What would not:** everything else in this document.
+
+### Multi-tenant reuse
+
 One vendor product, two deployments. Riverbend calls the field "Member
 Number" instead of "Member ID" and puts its Balance column second instead of
 third. Nothing about the *task* differs.
@@ -360,6 +416,45 @@ than an assertion:
   followed the reorder. Its structural fallback would also have resolved, and
   read the account number. That contrast is why `row_cell` outranks
   `region_path`.
+
+### Detecting and managing drift
+
+The brief asks how per-tenant and per-version drift is detected and managed,
+which is a different question from whether a run passed.
+
+**Detection is already collected on every run, including successful ones**,
+which is the part that matters — nobody reads the logs of runs that worked.
+
+| signal | where | what it means |
+|---|---|---|
+| locator tier | `tier_log`, every step | a step on its third fallback is degrading weeks before it breaks |
+| `degraded` | `result.degraded_steps` | the primary rule stopped resolving |
+| recovery counts | `result.recoveries` | a notice firing twice as often this month as last is a changed application |
+| per-step `duration_ms` | `run.jsonl` | a page that got slower is drift the checkpoints are absorbing |
+| `match_count > 1` | `Resolution` | a locator that used to be unique now is not — the dangerous one, because it still resolves |
+
+The tenant measurement above is this working: the same artifact against a
+deployment it was not written for succeeds **and reports the degradation**,
+which is the difference between "it still works" and "it still works, and
+something changed underneath it".
+
+**Management** has three tiers, and the artifact format is what makes them
+cheap. A tenant whose step has degraded gets a **sparse override** of that one
+step — the unit of repair is a field, not a document. A vendor version that
+breaks many tenants gets a **new artifact version**, with the old one still on
+disk and still runnable, because versions are files. Drift past what an
+override can express means **re-running discovery for that tenant**, and the
+result is a YAML diff in a pull request, which is the most reviewable form a
+behavioural change can take.
+
+**Two honest gaps.** `app.version_range` is declared in every artifact, printed
+by `cua show`, and **enforced nowhere** — a capability recorded against
+MemberConsole 4.3 will run against 5.0 and find out the hard way. Checking it
+before a run is a few lines and I did not write them. And nothing aggregates
+the tier logs: the data that would say "step 2 has been degrading across nine
+tenants for a month" is collected on every run and consumed by nobody. That
+aggregation is the single highest-value thing to build next (§7), because the
+signal already exists and only the reader is missing.
 
 ### Canonicalisation, honestly
 
@@ -587,8 +682,11 @@ after.
 3. Tier-drift alerting: the data is already collected on every run and nothing
    consumes it. A capability sliding from tier 0 to tier 2 over a month is the
    signal this design exists to produce, and right now a human has to go
-   looking for it.
-4. The embedded viewport, if operators ask for it.
+   looking for it. Cheap, because only the reader is missing.
+4. Enforce `app.version_range`. It is declared in every artifact and checked
+   nowhere, so a capability recorded against MemberConsole 4.3 will run against
+   5.0 and find out the hard way. A few lines, and I did not write them.
+5. The embedded viewport, if operators ask for it.
 
 **One thing I could not explain.** A live test file once ran in 4771s instead
 of ~106s. It did not reproduce; the same code runs in 106s and the arithmetic

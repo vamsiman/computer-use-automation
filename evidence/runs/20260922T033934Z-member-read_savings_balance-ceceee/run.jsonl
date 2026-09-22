@@ -1,0 +1,9 @@
+{"seq": 1, "at": "2026-09-22T03:39:34.525110+00:00", "kind": "policy", "action": "navigate", "target": null, "permitted": true, "rule": "risk", "reason": ""}
+{"seq": 2, "at": "2026-09-22T03:39:35.199755+00:00", "kind": "step", "step_id": "s1", "intent": "Open the member search screen", "action": "navigate", "target": null, "tier": null, "degraded": false, "ok": true, "duration_ms": 673, "policy_rule": "risk", "screenshot": "steps/001.png"}
+{"seq": 3, "at": "2026-09-22T03:39:35.240640+00:00", "kind": "policy", "action": "type", "target": "control right of \"Member ID:\"", "permitted": true, "rule": "risk", "reason": ""}
+{"seq": 4, "at": "2026-09-22T03:39:35.515483+00:00", "kind": "step", "step_id": "s2", "intent": "Enter the member number into the search field", "action": "type", "target": "control right of \"Member ID:\"", "tier": 0, "degraded": false, "ok": true, "duration_ms": 255, "policy_rule": "risk", "screenshot": "steps/002.png"}
+{"seq": 5, "at": "2026-09-22T03:39:35.541202+00:00", "kind": "policy", "action": "click", "target": "button \"Search\"", "permitted": true, "rule": "risk", "reason": ""}
+{"seq": 6, "at": "2026-09-22T03:39:36.269290+00:00", "kind": "step", "step_id": "s3", "intent": "Submit the search", "action": "click", "target": "button \"Search\"", "tier": 0, "degraded": false, "ok": true, "duration_ms": 715, "policy_rule": "risk", "screenshot": "steps/003.png"}
+{"seq": 7, "at": "2026-09-22T03:39:36.285800+00:00", "kind": "outcome", "code": "PERMISSION_DENIED", "message": "This operator is not permitted to view that member."}
+{"seq": 8, "at": "2026-09-22T03:39:36.287707+00:00", "kind": "finished", "result": "BusinessOutcome"}
+{"seq": 9, "at": "2026-09-22T03:39:36.291698+00:00", "kind": "finished", "result": "BusinessOutcome"}

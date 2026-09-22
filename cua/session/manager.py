@@ -243,8 +243,9 @@ class SessionManager:
         headless: bool | None = None,
         screenshot_dir: str | Path | None = None,
         session_id: str | None = None,
+        video_dir: str | Path | None = None,
     ) -> Session:
-        browser = BrowserSession(base_url, headless=headless)
+        browser = BrowserSession(base_url, headless=headless, video_dir=video_dir)
         surface = browser.start(screenshot_dir=screenshot_dir)
         session = Session(
             id=session_id or uuid4().hex[:12],

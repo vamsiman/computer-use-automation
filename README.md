@@ -19,6 +19,20 @@ member.read_savings_balance(member_id: string) -> {member_name: string, savings_
 
 ---
 
+## Watch it work
+
+![the compliance hold, handed to a person and handed back](evidence/media/03-escalation-handoff.gif)
+
+The run meets a compliance hold nothing in the capability declares. It does not
+guess — it pauses, a person deals with it in the same live browser window, and
+the engine re-checks the screen for itself before carrying on.
+
+More in [`evidence/media/`](evidence/media/): the ordinary path, a business
+outcome, a genuine failure, and the same capability running against a second
+tenant that renamed one of its fields.
+
+---
+
 ## What is here
 
 | | |

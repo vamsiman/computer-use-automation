@@ -89,6 +89,15 @@ broken.
 
 ---
 
+## Recordings
+
+`media/` — the same scenarios as GIFs and video, plus the operator console
+photographed while an intervention was genuinely open. See `media/README.md`.
+Worth watching `02-business-outcome` and `04-failure` back to back: both come
+back empty, one is the system working and one is it broken.
+
+---
+
 ## The cross-tenant measurement
 
 `tenant-tier-log.md` — one artifact, three deployments, the same answer, with
@@ -102,7 +111,9 @@ repairs it. See `REPORT.md` §4.
 
 ## What is not here
 
-No recording of a person using the console. The handoff is covered by
-`06-escalation-handoff` and by `tests/test_handoff_live.py`, which drives the
-console's own buttons against a live browser — but a screen capture would show
-the ergonomics, and there isn't one.
+No recording of a person driving the console with their own hands. The
+operator in `media/03-escalation-handoff` is scripted — Playwright standing in
+for a mouse — and the console screenshot beside it was taken while that same
+intervention was open. Everything around the substitution is the production
+path, but the substitution is real and is marked as such wherever the media is
+described. `scripts/uat.py --case handoff` runs it with an actual person.

@@ -428,19 +428,46 @@ class BrowserSession:
     the currently-running step has to be able to reach the window.
     """
 
-    def __init__(self, base_url: str, headless: bool | None = None) -> None:
+    def __init__(
+        self,
+        base_url: str,
+        headless: bool | None = None,
+        video_dir: str | Path | None = None,
+    ) -> None:
         self.base_url = base_url
         self.headless = headless_default() if headless is None else headless
+        #: Where to write a recording of the whole session, if one is wanted.
+        #: Off by default: a video of a banking screen is the least redactable
+        #: artefact this system can produce, and it should be something
+        #: somebody asked for rather than something that happens.
+        self.video_dir = Path(video_dir) if video_dir else None
         self._browser: Browser | None = None
+        self._context = None
 
     def start(self, screenshot_dir: str | Path | None = None) -> WebSurface:
         self._browser = _driver().chromium.launch(headless=self.headless)
-        context = self._browser.new_context(viewport={"width": 1280, "height": 900})
-        page = context.new_page()
+        options: dict = {"viewport": {"width": 1280, "height": 900}}
+        if self.video_dir is not None:
+            self.video_dir.mkdir(parents=True, exist_ok=True)
+            options["record_video_dir"] = str(self.video_dir)
+            options["record_video_size"] = {"width": 1280, "height": 900}
+        self._context = self._browser.new_context(**options)
+        page = self._context.new_page()
         return WebSurface(page, self.base_url, screenshot_dir)
 
     def stop(self) -> None:
-        """Close this session's browser, leaving the shared driver running."""
+        """Close this session's browser, leaving the shared driver running.
+
+        The context is closed first when a recording is being made: Playwright
+        only finalises the video file on context close, and closing the
+        browser out from under it leaves a truncated one.
+        """
+        if self._context is not None and self.video_dir is not None:
+            try:
+                self._context.close()
+            except Exception:
+                pass
+        self._context = None
         if self._browser is not None:
             try:
                 self._browser.close()

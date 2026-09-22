@@ -85,6 +85,42 @@ def policy_for(url: str) -> PolicyEngine:
     )
 
 
+def watch_for_a_closed_window(session, run, console=None) -> None:
+    """Notice when the person shuts the browser, and stop.
+
+    Without this, closing the window leaves the run parked on its handoff
+    timeout -- half an hour of a terminal that looks frozen and is not. The
+    session is gone the moment the window is, so the honest response is to
+    abort the run and say so.
+
+    ``page.is_closed()`` reads a local flag rather than talking to the
+    browser, so it is safe to poll from a thread that does not own the
+    Playwright connection.
+    """
+    page = getattr(session.surface, "page", None)
+    if page is None:
+        return
+
+    def poll() -> None:
+        while True:
+            try:
+                closed = page.is_closed()
+            except Exception:
+                closed = True
+            if closed:
+                say("")
+                say("!! the browser window was closed -- abandoning the run")
+                try:
+                    if not run.is_finished:
+                        run.abort("the operator closed the browser window")
+                except Exception:
+                    pass
+                return
+            time.sleep(1)
+
+    threading.Thread(target=poll, daemon=True).start()
+
+
 def main() -> int:
     seed.seed()
     exceptional.reset_all()
@@ -112,6 +148,7 @@ def main() -> int:
     )
     manager._sessions[run.id] = run
     run.start(run_id="demo")
+    watch_for_a_closed_window(session, run)
 
     artifact = CapabilityStore().load("member.read_savings_balance")
     recorder = Recorder.start(

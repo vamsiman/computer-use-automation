@@ -135,6 +135,10 @@ def main() -> int:
         deadline = time.monotonic() + 180
         clicked = False
         while time.monotonic() < deadline:
+            if surface.page.is_closed():
+                say("")
+                say("!! the browser window was closed -- stopping")
+                break
             try:
                 current = surface.observe()
             except Exception:

@@ -85,6 +85,11 @@ def policy_for(url: str) -> PolicyEngine:
     )
 
 
+#: Set when the script is tearing down on purpose, so the watchdog below
+#: stays quiet about a window it closed itself.
+SHUTTING_DOWN = threading.Event()
+
+
 def watch_for_a_closed_window(session, run, console=None) -> None:
     """Notice when the person shuts the browser, and stop.
 
@@ -108,6 +113,8 @@ def watch_for_a_closed_window(session, run, console=None) -> None:
             except Exception:
                 closed = True
             if closed:
+                if SHUTTING_DOWN.is_set():
+                    return
                 say("")
                 say("!! the browser window was closed -- abandoning the run")
                 try:
@@ -236,6 +243,7 @@ def main() -> int:
     except KeyboardInterrupt:
         say("\nstopping")
     finally:
+        SHUTTING_DOWN.set()
         manager.close_all()
         console.stop()
         app_server.shutdown()

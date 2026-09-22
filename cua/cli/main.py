@@ -312,7 +312,10 @@ def replay(
     session = manager.create(target, headless=not headed)
     try:
         credentials = Credentials.from_env()
-        authenticate(session.surface, credentials)
+        # The sign-in screen is the one place legacy software says what
+        # version it is, and the bootstrap is the only part of a run that
+        # always sees it.
+        signed_in = authenticate(session.surface, credentials)
         session.start()
 
         recorder = (
@@ -326,6 +329,7 @@ def replay(
             recorder=recorder,
             allow_draft=allow_draft,
             session_id=session.id,
+            app_version=signed_in.app_version,
             reauthenticate=lambda: authenticate(session.surface, credentials),
             escalate=Handoff(session, recorder=recorder, inputs=values,
                              capability=artifact.ref),
@@ -338,6 +342,25 @@ def replay(
         raise typer.Exit(code=0 if result.ok else 1)
     finally:
         manager.close_all()
+
+
+@app.command()
+def drift(
+    root: Path = typer.Option(None, help="Where the evidence bundles live."),
+) -> None:
+    """What the tier logs have been saying across every run.
+
+    Every replay records which rule found each control, on successful runs as
+    much as failed ones, because a capability sliding onto its third fallback
+    is degrading weeks before it breaks. This reads that back.
+
+    It is a report rather than a monitor. No daemon, no thresholds, no
+    alerting: the point is that the answer is already in the evidence on disk,
+    and what was missing was somebody reading it.
+    """
+    from cua.evidence.drift import DEFAULT_ROOT, collect, render
+
+    echo(render(collect(root or DEFAULT_ROOT)))
 
 
 @app.command()

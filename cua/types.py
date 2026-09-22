@@ -167,6 +167,10 @@ class FailureCategory(StrEnum):
     POLICY = "policy"
     #: Caller broke the capability's contract (missing or ill-typed input).
     CONTRACT = "contract"
+    #: The application is not a version this capability was recorded for.
+    #: Distinct from a locator failure on purpose: nothing is broken, the
+    #: capability is simply being pointed at software it never saw.
+    INCOMPATIBLE_APP = "incompatible_app"
     #: The capability was started from the wrong place. Distinct from a failed
     #: checkpoint: nothing went wrong during the run, the run should not have
     #: begun here.

@@ -34,6 +34,7 @@ import time
 from dataclasses import dataclass
 from typing import Any, Callable
 
+from cua.artifact.compat import explain, is_compatible
 from cua.artifact.models import (
     Artifact,
     Checkpoint,
@@ -159,6 +160,7 @@ class ReplayEngine:
         approve: Callable[[Step], bool] | None = None,
         allow_draft: bool = False,
         session_id: str | None = None,
+        app_version: str | None = None,
     ) -> None:
         self.surface = surface
         self.artifact = artifact
@@ -169,6 +171,10 @@ class ReplayEngine:
         self.approve = approve
         self.allow_draft = allow_draft
         self.session_id = session_id
+        #: What the application said it was, usually read off the sign-in
+        #: screen by the auth bootstrap. ``None`` means nobody knows, which is
+        #: permitted -- see :mod:`cua.artifact.compat`.
+        self.app_version = app_version
 
     # --- the run ---------------------------------------------------------
 
@@ -513,6 +519,25 @@ class ReplayEngine:
                     "allow_draft to run it anyway"
                 ),
             )
+        if not is_compatible(self.artifact.capability.app.version_range, self.app_version):
+            # Checked before the contract, because this is not the caller's
+            # mistake and telling them their arguments are fine first would
+            # bury the actual reason.
+            return Failure(
+                capability=self.artifact.ref,
+                category=FailureCategory.INCOMPATIBLE_APP,
+                expected=(
+                    f"{self.artifact.capability.app.product} "
+                    f"{self.artifact.capability.app.version_range}"
+                ),
+                observed=str(self.app_version),
+                detail=(
+                    explain(self.artifact.capability.app.version_range, self.app_version)
+                    + ". Re-record the capability against this version, or "
+                    "widen the range if it is known to be compatible."
+                ),
+            )
+
         problems = validate_inputs(self.artifact, inputs)
         if problems and self._ask_for_missing(inputs, problems):
             problems = validate_inputs(self.artifact, inputs)

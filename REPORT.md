@@ -447,14 +447,44 @@ override can express means **re-running discovery for that tenant**, and the
 result is a YAML diff in a pull request, which is the most reviewable form a
 behavioural change can take.
 
-**Two honest gaps.** `app.version_range` is declared in every artifact, printed
-by `cua show`, and **enforced nowhere** — a capability recorded against
-MemberConsole 4.3 will run against 5.0 and find out the hard way. Checking it
-before a run is a few lines and I did not write them. And nothing aggregates
-the tier logs: the data that would say "step 2 has been degrading across nine
-tenants for a month" is collected on every run and consumed by nobody. That
-aggregation is the single highest-value thing to build next (§7), because the
-signal already exists and only the reader is missing.
+**Both halves are now wired up**, because each was a promise the code had not
+kept.
+
+`app.version_range` is enforced before the browser is touched. The version is
+read off the **sign-in screen**, which is the one place legacy software says
+what it is and the only screen a run is guaranteed to see — so the auth
+bootstrap captures it and the engine refuses a capability recorded for a
+version this deployment is not:
+
+```
+Failure(INCOMPATIBLE_APP), 0 steps
+  this capability was recorded for >=9.0, and the application reports
+  'MemberConsole 4.3.1'. Re-record the capability against this version, or
+  widen the range if it is known to be compatible.
+```
+
+The check is conservative in **one direction only**. An *unknown* version never
+blocks a run: most applications never say what they are, and a system that
+refused to work whenever it could not identify the software would be useless in
+exactly the legacy estate it is for. A *known* version outside a *declared*
+range does block, because at that point both facts are in hand and continuing
+is a choice to ignore one.
+
+`cua drift` reads the tier logs back across every bundle on disk. Against the
+31 runs in `evidence/`, it finds what it should:
+
+```
+member.read_savings_balance@1.0.0  s2  label_proximity/region_path  2/26 degraded
+member.read_savings_balance@1.0.0  s3  role_name                    0/26 healthy
+```
+
+Those two degraded runs are the riverbend deployment. The signal the design has
+been claiming since §2 is now legible without reading a single log file.
+
+It is a **report, not a monitor** — no daemon, no thresholds, no alerting. The
+brief is explicit that building scaling infrastructure is not rewarded, and the
+claim worth proving was that the answer is derivable from evidence already on
+disk.
 
 ### Canonicalisation, honestly
 
@@ -679,14 +709,9 @@ after.
    by a real capability rather than by a unit test of the gate.
 2. A second discovery run against a *different* goal, to find the next class of
    defect the first one could not.
-3. Tier-drift alerting: the data is already collected on every run and nothing
-   consumes it. A capability sliding from tier 0 to tier 2 over a month is the
-   signal this design exists to produce, and right now a human has to go
-   looking for it. Cheap, because only the reader is missing.
-4. Enforce `app.version_range`. It is declared in every artifact and checked
-   nowhere, so a capability recorded against MemberConsole 4.3 will run against
-   5.0 and find out the hard way. A few lines, and I did not write them.
-5. The embedded viewport, if operators ask for it.
+3. Turn `cua drift` from a report into something that watches — a threshold, a
+   place to send the answer. The reading is done; the noticing is not.
+4. The embedded viewport, if operators ask for it.
 
 **One thing I could not explain.** A live test file once ran in 4771s instead
 of ~106s. It did not reproduce; the same code runs in 106s and the arithmetic

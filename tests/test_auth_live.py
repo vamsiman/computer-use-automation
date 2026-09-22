@@ -242,3 +242,31 @@ def test_a_session_survives_the_function_that_authenticated_it(manager, live_app
     recovered = manager.get(session_id)
     assert is_authenticated(recovered.surface)
     assert recovered.surface.observe().find("heading", "Member Search")
+
+
+# --- what the application says it is --------------------------------------
+
+
+def test_the_sign_in_screen_gives_up_the_application_version(session):
+    """Legacy software announces its version on the sign-in page and nowhere
+    else, and the bootstrap is the only part of a run guaranteed to look at
+    it. That is why the version is read here rather than by the replay engine,
+    which may never see this screen at all.
+    """
+    result = authenticate(session.surface, good())
+
+    assert result.app_version == "MemberConsole 4.3.1"
+    # The shortest node carrying the number, not the ancestor cell that
+    # swallowed half the page with it.
+    assert "User ID" not in result.app_version
+
+
+def test_an_already_signed_in_session_reports_no_version(session):
+    """Not a failure. The sign-in screen is not in front of us, so there is
+    nothing to read, and unknown is exactly what the compatibility check is
+    built to tolerate."""
+    authenticate(session.surface, good())
+    second = authenticate(session.surface, good())
+
+    assert second.already_authenticated is True
+    assert second.app_version is None

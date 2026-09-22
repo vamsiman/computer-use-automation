@@ -16,6 +16,7 @@ profile, not a new code path.
 from __future__ import annotations
 
 import os
+import re
 from dataclasses import dataclass, replace
 
 from cua.locators import LabelProximitySpec, Locator, RoleNameSpec
@@ -119,6 +120,46 @@ MEMBER_CONSOLE = AuthProfile(
 class AuthResult:
     already_authenticated: bool
     attempts: int
+    #: What the application said it was, if it said anything.
+    #:
+    #: Read here because this is the one screen we are guaranteed to look at.
+    #: Legacy software announces its version on the sign-in page and nowhere
+    #: else, and the bootstrap is the only part of a run that always sees it.
+    #: A capability can then be refused against a version it was not recorded
+    #: for, which is what ``AppRef.version_range`` has always promised and
+    #: never delivered.
+    app_version: str | None = None
+
+
+#: How software names itself on a sign-in screen: "MemberConsole 4.3.1",
+#: "Release 4.3.1 (build 9912)", "v4.3.1". Anything with a dotted number in
+#: it will do; the parsing happens in :mod:`cua.artifact.compat`.
+#: A dotted number anywhere in a node's text. Software announces itself
+#: as "MemberConsole 4.3.1", "Release 4.3.1 (build 9912)", "v4.3.1"; the
+#: number is the only part worth agreeing on.
+_VERSION_HINT = re.compile(r"[0-9]+(?:\.[0-9]+)+")
+
+
+def read_app_version(snapshot) -> str | None:
+    """What the application says it is, from the sign-in screen.
+
+    Returns the *shortest* piece of text carrying a version number. A
+    legacy page is a nest of tables, so the same number appears on the
+    little cell that holds it and again on every ancestor cell that
+    swallowed it -- "Sign In MemberConsole 4.3.1 User ID: Password:" is a
+    real node on this page. The shortest is the one that was put there to
+    say the version.
+
+    Best effort and deliberately so. A version we cannot find is not an
+    error -- most applications never say -- and the compatibility check
+    treats unknown as permitted.
+    """
+    found: list[str] = []
+    for node in snapshot.tree.walk():
+        text = (node.name or node.value or "").strip()
+        if text and _VERSION_HINT.search(text):
+            found.append(text)
+    return min(found, key=len) if found else None
 
 
 def _is_blank(snapshot) -> bool:
@@ -217,7 +258,12 @@ def authenticate(
         snapshot = surface.observe()
 
     if not surface.resolve(profile.sign_in_form, snapshot).resolved:
+        # Already signed in, so the sign-in screen is not in front of us and
+        # its version hint is not available. Not a problem: unknown is the
+        # answer the compatibility check is built to tolerate.
         return AuthResult(already_authenticated=True, attempts=0)
+
+    version = read_app_version(snapshot)
 
     # Note what is deliberately *not* here: a check for an error banner before
     # submitting. A message already on the form describes the previous
@@ -261,7 +307,9 @@ def authenticate(
         # Still looking at the form with no message we recognise.
         raise AuthUnavailable("sign-in did not complete and gave no reason")
 
-    return AuthResult(already_authenticated=False, attempts=1)
+    return AuthResult(
+        already_authenticated=False, attempts=1, app_version=version
+    )
 
 
 def _raise_if_blocked(surface: Surface, snapshot, profile: AuthProfile) -> None:

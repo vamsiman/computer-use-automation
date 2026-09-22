@@ -1,5 +1,6 @@
 """Evidence: what the run wrote down about itself, and what it refused to."""
 
+from cua.evidence.drift import Report, StepHistory, collect, render
 from cua.evidence.recorder import (
     DEFAULT_ROOT,
     EvidenceConfig,
@@ -18,6 +19,10 @@ from cua.evidence.redact import (
 )
 
 __all__ = [
+    "Report",
+    "StepHistory",
+    "collect",
+    "render",
     "DEFAULT_ROOT",
     "EvidenceConfig",
     "MIN_LITERAL_LENGTH",

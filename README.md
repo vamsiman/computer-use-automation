@@ -162,6 +162,19 @@ a single field, three deployments. See `evidence/tenant-tier-log.md`.
 
 ---
 
+### Has anything started drifting?
+
+```bash
+cua drift
+```
+
+Every replay records which locator rule found each control — on successful runs
+as much as failed ones, because a capability sliding onto its third fallback is
+degrading weeks before it breaks. This reads that back across every run on disk
+and says which steps are resolving worse than they used to.
+
+---
+
 ## Tests
 
 ```bash

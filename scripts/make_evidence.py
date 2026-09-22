@@ -13,7 +13,7 @@ import sys
 import threading
 from pathlib import Path
 
-sys.path.insert(0, ".")
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 os.environ["CUA_HEADLESS"] = "1"
 
 from werkzeug.serving import make_server  # noqa: E402

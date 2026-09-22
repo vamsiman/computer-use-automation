@@ -57,39 +57,50 @@ reasoning rather than the code.
 
 Python 3.11+.
 
+**macOS / Linux**
+
 ```bash
-python -m venv .venv
-
-# Activate it. The `cua` command below is installed into the venv, so it is
-# only on your PATH once this has run.
-.venv\Scripts\Activate.ps1      # Windows PowerShell
-# .venv\Scriptsctivate.bat    # Windows cmd
-# source .venv/bin/activate      # macOS / Linux
-
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -e ".[dev]"
 playwright install chromium
 ```
 
-If `cua` comes back as "not recognized" or "command not found", the virtual
-environment is not active. Either activate it, or run the module directly —
-this always works:
+**Windows (PowerShell)**
+
+```powershell
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+pip install -e ".[dev]"
+playwright install chromium
+```
+
+Activating matters: `cua` is installed *into* the virtual environment, so it
+is only on your PATH once that has run. If it comes back "command not found"
+or "not recognized", that is why -- and this form needs no activation at all:
 
 ```bash
-.venv/Scripts/python -m cua.cli.main list      # Windows
-./.venv/bin/python -m cua.cli.main list        # macOS / Linux
+.venv/bin/python -m cua.cli.main list          # macOS / Linux
+.venv\Scripts\python -m cua.cli.main list      # Windows
 ```
+
+Everything below is written as `cua ...`; substitute that longer form if you
+would rather not activate anything.
 
 Only **discovery** needs an API key. Everything else — replay, the error
 taxonomy, the handoff, the console, the whole test suite — runs offline, so
 you can skip this entirely and still run every demo below except step 1.
 
 ```bash
-cp .env.example .env        # then put YOUR OWN key in it
+cp .env.example .env          # macOS / Linux -- then put YOUR OWN key in it
+copy .env.example .env        # Windows
 ```
 
+Or set it in the environment directly:
+
 ```bash
-# or set it in the environment directly
-export ANTHROPIC_API_KEY=sk-ant-your-key-here   # discovery only
+export ANTHROPIC_API_KEY=sk-ant-your-key-here            # macOS / Linux
+$env:ANTHROPIC_API_KEY = "sk-ant-your-key-here"          # Windows PowerShell
 ```
 
 `.env` is gitignored. No key is committed to this repository and none ever
@@ -187,6 +198,31 @@ Every replay records which locator rule found each control — on successful run
 as much as failed ones, because a capability sliding onto its third fallback is
 degrading weeks before it breaks. This reads that back across every run on disk
 and says which steps are resolving worse than they used to.
+
+---
+
+## Seeing it by hand
+
+Five scripts, none of which need anything on `PYTHONPATH` — they find the
+project from their own location, so `python scripts/<name>.py` works from
+anywhere on any platform.
+
+```bash
+python scripts/hitl.py              # the human handoff, narrated, no time pressure
+python scripts/uat.py --list        # eleven acceptance cases
+python scripts/uat.py --case handoff
+python scripts/record_media.py      # regenerate evidence/media/
+python scripts/make_evidence.py     # regenerate evidence/runs/
+```
+
+**`hitl.py` is the one to run** if you only run one. It drives itself into a
+compliance hold, stops, and hands you the session — printing every state change
+as it happens and, while you hold control, proving the automation is *refused*
+rather than merely discouraged.
+
+Browsers are headed for these on purpose: the window that opens **is** the live
+session, which is what makes the handoff real rather than simulated. Set
+`CUA_HEADLESS=1` if you would rather they were not.
 
 ---
 

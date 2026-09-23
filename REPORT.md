@@ -189,6 +189,18 @@ and asserts `Escalated`. A missing input becomes a *typed field* validated by
 the capability's own `InputSpec`, so the console is not a laxer front door than
 the API.
 
+**Where that model stops working, and why it does not matter much.** Acting in
+the adjacent window assumes the operator is at the machine the browser is on —
+true for attended automation on a desktop, false the moment this runs
+server-side, which is the commoner shape. Then you need a streamed viewport or
+VNC into the session.
+
+The reason that is a component swap rather than a redesign: **the console
+reaches the session only through the control-token API** — `take_control`,
+`hand_back`, `abort`. Nothing in it touches the browser. So where the human's
+hands are is invisible to the state machine, the engine and the evidence log
+alike. That, rather than "we cut the viewport", is the claim worth making.
+
 **Known gap, stated plainly:** human-action capture works in tests and in an
 isolated live check, and recorded nothing in one real handoff where a person
 clicked while the automation thread was parked. That shape is untested — every

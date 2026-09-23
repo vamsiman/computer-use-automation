@@ -148,8 +148,8 @@ number.
 
 **Drift** is detected from data every run already writes — tier, `degraded`,
 recovery counts, step duration, and `match_count > 1` (the dangerous one: still
-resolves, no longer means one control). `cua drift` reads it back across all 31
-bundles on disk and finds exactly the two degraded riverbend runs. Repair is a
+resolves, no longer means one control). `cua drift` reads it back across every
+bundle on disk and finds exactly the degraded riverbend run. Repair is a
 field (override), a file (new version), or a re-recording — and
 `app.version_range` is enforced before the browser opens, using the version
 read off the sign-in screen, the one place legacy software says what it is.

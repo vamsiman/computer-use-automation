@@ -471,7 +471,7 @@ range does block, because at that point both facts are in hand and continuing
 is a choice to ignore one.
 
 `cua drift` reads the tier logs back across every bundle on disk. Against the
-31 runs in `evidence/`, it finds what it should:
+runs in `evidence/`, it finds what it should:
 
 ```
 member.read_savings_balance@1.0.0  s2  label_proximity/region_path  2/26 degraded

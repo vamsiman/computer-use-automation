@@ -1,5 +1,0 @@
-{"seq": 1, "at": "2026-09-21T04:22:52.215744+00:00", "kind": "evidence_error", "what": "a11y", "error": "could not read the main frame"}
-{"seq": 2, "at": "2026-09-21T04:22:52.219395+00:00", "kind": "evidence_error", "what": "screenshot", "error": "Cannot switch to a different thread\n\tCurrent:  <greenlet.greenlet object at 0x000001AFBECE1FC0 (otid=0x000001AFBA487BC0) current active started main>\n\tExpected: <greenlet.greenlet object at 0x000001AFBD4C8D80 (otid=0x000001AFBA487B40) suspended active started main>"}
-{"seq": 3, "at": "2026-09-21T04:22:52.220394+00:00", "kind": "failure", "step_id": "s1", "reason": "could not read the main frame", "category": "surface_error", "captured": {"page_source": "page.html"}}
-{"seq": 4, "at": "2026-09-21T04:22:52.222391+00:00", "kind": "finished", "result": "Failure"}
-{"seq": 5, "at": "2026-09-21T04:22:56.849543+00:00", "kind": "finished", "result": "Failure"}

@@ -115,6 +115,21 @@ deployment would put in front of it.
 
 ## The demo, start to finish
 
+Commands below are written for **bash / zsh** (macOS, Linux). They work
+verbatim in a Mac terminal. On Windows PowerShell the `cua ...` commands are
+identical; only two things differ, and both appear below:
+
+| | bash / zsh | PowerShell |
+|---|---|---|
+| line continuation | `\` at end of line | `` ` `` at end of line, or put it on one line |
+| an environment variable | `export NAME=value` | `$env:NAME = "value"` |
+
+> **On macOS, port 5000 is taken by AirPlay Receiver** (Monterey and later).
+> If `cua serve-app` fails to bind, or the pages come back oddly, use another
+> port — `cua serve-app --port 5055`, then pass
+> `--target http://localhost:5055` to every `cua replay`. Or turn AirPlay
+> Receiver off in System Settings → General → AirDrop & Handoff.
+
 ```bash
 cua seed                                   # build the fake credit union's data
 cua serve-app                              # http://localhost:5000, leave running
@@ -221,8 +236,17 @@ as it happens and, while you hold control, proving the automation is *refused*
 rather than merely discouraged.
 
 Browsers are headed for these on purpose: the window that opens **is** the live
-session, which is what makes the handoff real rather than simulated. Set
-`CUA_HEADLESS=1` if you would rather they were not.
+session, which is what makes the handoff real rather than simulated. If you
+would rather they were not:
+
+```bash
+export CUA_HEADLESS=1                  # macOS / Linux
+$env:CUA_HEADLESS = "1"                # Windows PowerShell
+```
+
+`python` here means the one in the activated virtual environment. If you have
+not activated it, `.venv/bin/python scripts/hitl.py` (macOS / Linux) or
+`.venv\Scripts\python scripts\hitl.py` (Windows) does the same thing.
 
 ---
 
@@ -275,3 +299,10 @@ something a capability does.
 | `CUA_REDACTION_SALT` | salts the PII tokens in evidence |
 | `CUA_HANDOFF_TIMEOUT` | how long a paused run waits for a person (default 900s) |
 | `TENANT` | which tenant `cua serve-app` serves |
+
+Set them the way your shell does it:
+
+```bash
+export CUA_HEADLESS=1                  # macOS / Linux
+$env:CUA_HEADLESS = "1"                # Windows PowerShell
+```
